@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: npm ci
-      - name: ESLint (LWC), Apex grammar, complexity and metadata guardrails
+      - name: ESLint (LWC), Apex grammar, complexity, metadata guardrails and documentation links
         run: npm run lint
       - name: Prettier (Apex, LWC JS/HTML/CSS)
         run: npm run format:check

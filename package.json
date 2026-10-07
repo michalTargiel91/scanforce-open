@@ -5,10 +5,11 @@
   "private": true,
   "license": "Apache-2.0",
   "scripts": {
-    "lint": "npm run lint:lwc && npm run lint:apex && npm run lint:metadata",
+    "lint": "npm run lint:lwc && npm run lint:apex && npm run lint:metadata && npm run lint:docs",
     "lint:lwc": "eslint force-app/main/default/lwc",
     "lint:apex": "node scripts/check-apex.mjs && python3 scripts/check-complexity.py",
     "lint:metadata": "python3 scripts/check-metadata.py",
+    "lint:docs": "python3 scripts/check-docs.py",
     "test": "npm run test:unit && npm run test:python",
     "test:unit": "sfdx-lwc-jest",
     "test:unit:coverage": "sfdx-lwc-jest --coverage -- --no-cache",
