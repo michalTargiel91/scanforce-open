@@ -57,6 +57,18 @@ class ServerTestCase(unittest.TestCase):
 
 
 class ProtocolTest(ServerTestCase):
+    def test_paths_outside_the_api_are_not_protocol_answers(self):
+        for path in ("/v1/jobs/scanforce-open-connection-check", "/", "/connect/jobs/x"):
+            conn = http.client.HTTPConnection(*self.server.server_address, timeout=5)
+            try:
+                conn.request("GET", path, headers={"Authorization": f"Bearer {self.token}"})
+                response = conn.getresponse()
+                body = response.read()
+            finally:
+                conn.close()
+            self.assertEqual(response.status, 404)
+            self.assertNotIn(b"NOT_FOUND", body, path)
+
     def test_success_and_restart_idempotency(self):
         _, job = self.request()
         path = "/connect/v1/jobs/" + job["jobId"]

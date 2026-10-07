@@ -38,7 +38,7 @@ examples=0
 allow_pending=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --target-org) target_org="${2:-}"; shift 2 ;;
+    --target-org) [[ $# -ge 2 ]] || { usage >&2; exit 2; }; target_org="$2"; shift 2 ;;
     --provider)
       [[ "${2:-}" == docsolved ]] || { echo 'Only --provider docsolved is predefined; use --endpoint for others.' >&2; exit 2; }
       endpoint='https://docsolved.ai/connect'; shift 2 ;;
@@ -60,6 +60,9 @@ endpoint="${endpoint%/}"
 if ! [[ "$endpoint" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?(/[A-Za-z0-9._~%/-]*)?$ ]]; then
   echo 'The endpoint must be an https:// URL without credentials, query string or fragment.' >&2
   exit 2
+fi
+if [[ "$endpoint" != */connect && "$endpoint" != https://example.invalid/connect ]]; then
+  echo "Note: $endpoint does not end in /connect. Use the prefix before /v1/jobs, or Test connection will report 'Not a /connect/v1 provider'." >&2
 fi
 command -v sf >/dev/null || { echo 'Salesforce CLI (sf) is required.' >&2; exit 1; }
 
@@ -141,11 +144,27 @@ if [[ "$examples" == 1 ]]; then
 fi
 
 if [[ "$permissions" == 1 ]]; then
+  unassigned=()
   for permission_set in SfdcDcx_Admin SfdcDcx_Provider_Access; do
     # An existing assignment is reported as a duplicate; that is fine.
-    sf org assign permset --target-org "$target_org" --name "$permission_set" --json >/dev/null 2>&1 || true
+    reply="$(sf org assign permset --target-org "$target_org" --name "$permission_set" --json 2>/dev/null || true)"
+    printf '%s' "$reply" | python3 -c '
+import json, sys
+text = sys.stdin.read()
+try:
+    ok = json.loads(text).get("status") == 0
+except ValueError:
+    ok = False
+sys.exit(0 if ok or "duplicate" in text.lower() else 1)' || unassigned+=("$permission_set")
   done
-  echo 'Assigned ScanForce Open Administrator and Provider Access to the deploying user.'
+  if [[ ${#unassigned[@]} -eq 0 ]]; then
+    echo 'Assigned ScanForce Open Administrator and Provider Access to the deploying user.'
+  else
+    echo "WARNING: could not assign ${unassigned[*]} to the deploying user." >&2
+    echo '  SfdcDcx_Provider_Access is deployed by provider-config; if the credential already existed,' >&2
+    echo '  deploy it with: sf project deploy start --target-org ALIAS --source-dir provider-config/permissionsets' >&2
+    echo '  Without Provider Access, jobs stay Queued (see docs/troubleshooting.md).' >&2
+  fi
 fi
 
 if [[ "$recovery" == 1 ]]; then

@@ -10,6 +10,8 @@ environment variable and is never printed.
 By default it submits a few tiny synthetic documents (one accepted job, one
 idempotency conflict, one unsupported type). Paid providers may count them.
 Use --connection-only for the no-cost authentication and lookup checks.
+
+Exit codes: 0 conformant (warnings allowed), 1 at least one FAIL, 2 provider unreachable.
 """
 from __future__ import annotations
 
@@ -75,17 +77,100 @@ class Response:
         return None
 
 
+PROTOCOL = "docs/provider-protocol.md"
+
+# What each rule expects and how to fix it. Keys are check names (or prefixes for per-endpoint checks).
+GUIDANCE = {
+    "unauthenticated request rejected": (
+        "GET /v1/jobs/{id}", "HTTP 401 or 403 when no credential is sent",
+        "Authenticate every request before routing or lookup (protocol §8)."),
+    "connection check returns 404 NOT_FOUND": (
+        "GET /v1/jobs/scanforce-open-connection-check",
+        'HTTP 404 with {"error":{"code":"NOT_FOUND",...}} after successful authentication',
+        "401/403: the token or auth header is wrong (try --auth-header/--auth-scheme). "
+        "404 without JSON: the base URL is wrong; it must be the prefix before /v1/jobs, usually ending in /connect "
+        "(protocol §9)."),
+    "submit returns 202 or 200": (
+        "POST /v1/jobs", "HTTP 202 (or 200) for a valid PDF up to 5 MiB",
+        "Accept raw bytes with Content-Type application/pdf, image/png or image/jpeg; no multipart (protocol §2)."),
+    "submit returns jobId and status": (
+        "POST /v1/jobs", 'JSON {"jobId": "[A-Za-z0-9][A-Za-z0-9_-]{0,199}", "status": one of the six states}',
+        "Return the job identity as JSON; job IDs must not contain slashes, dots or URLs (protocol §2, §4)."),
+    "replay with same key returns the same job": (
+        "POST /v1/jobs (same Idempotency-Key, same bytes)", "the original jobId, HTTP 200 or 202, no new work",
+        "Persist key, fingerprint and job ID in one transaction under a unique constraint scoped to the "
+        "credential, before replying (protocol §5)."),
+    "same key with different bytes is 409 IDEMPOTENCY_CONFLICT": (
+        "POST /v1/jobs (same Idempotency-Key, different bytes)", 'HTTP 409 with code "IDEMPOTENCY_CONFLICT"',
+        "Fingerprint at least bytes, content type and X-Document-Type, and compare it on replay (protocol §5)."),
+    "unsupported media type is 415 UNSUPPORTED_FILE_TYPE": (
+        "POST /v1/jobs (Content-Type: text/plain)", 'HTTP 415 with code "UNSUPPORTED_FILE_TYPE"',
+        "Reject anything other than application/pdf, image/png and image/jpeg before processing (protocol §2)."),
+    "status returns the same job": (
+        "GET /v1/jobs/{jobId}", 'HTTP 200 JSON {"jobId": <requested id>, "status": one of the six states}',
+        "Echo the requested jobId exactly and use only queued, processing, review_required, completed, "
+        "failed or cancelled (protocol §3, §4)."),
+    "job reaches a final or review state": (
+        "GET /v1/jobs/{jobId}", "completed, review_required, failed or cancelled within --deadline seconds",
+        "Salesforce times out after about 60 minutes; raise --deadline if your pipeline is slow (protocol §4)."),
+    "result envelope matches the protocol": (
+        "GET /v1/jobs/{jobId}/result",
+        "HTTP 200 JSON with jobId, status (as just reported), documentType (string), result (object), "
+        "warnings (array) and reviewUrl (null, /path or https:// URL, at most 255 characters)",
+        "Return exactly this envelope; never put file content, OCR dumps or markup in it (protocol §3)."),
+    "result stays within 102,400 bytes": (
+        "GET /v1/jobs/{jobId}/result", "a body of at most 102,400 bytes",
+        'Return compact business fields only; if the real result is larger reply 413 "RESULT_TOO_LARGE" '
+        "(protocol §3)."),
+    "result before completion is 409 RESULT_NOT_READY (or a terminal error)": (
+        "GET /v1/jobs/{jobId}/result", 'HTTP 409 "RESULT_NOT_READY" before a result exists',
+        "Answer early result requests with 409 instead of an empty or partial result (protocol §3)."),
+    "reviewUrl is on the provider origin": (
+        "GET /v1/jobs/{jobId}/result", "a provider-relative path or an https:// URL on the base URL's origin",
+        "Salesforce stores links to other origins but never offers them to users. Serve a path on the API "
+        "origin that redirects signed-in reviewers (protocol §3, review links)."),
+    "response Content-Type is application/json": (
+        "every endpoint", "Content-Type: application/json", "Send JSON with an application/json content type "
+        "(protocol §1)."),
+    "no redirects": (
+        "every endpoint", "no 3xx responses", "Serve the API directly at the configured base URL; Salesforce "
+        "treats any redirect as an invalid response (protocol §1)."),
+    "response size": (
+        "every endpoint", "bodies of at most 102,400 bytes", "Keep responses compact (protocol §1)."),
+    "Cache-Control no-store": (
+        "every endpoint", "Cache-Control: no-store", "Recommended so proxies never cache job data (protocol §1)."),
+}
+
+
+def guidance(name: str):
+    for key in (name, name.split(": ", 1)[-1]):
+        if key in GUIDANCE:
+            return GUIDANCE[key]
+    return ("", "", "")
+
+
 @dataclass
 class Report:
     results: list = field(default_factory=list)
 
     def add(self, name: str, ok: bool, detail: str = "", warning: bool = False):
         level = "PASS" if ok else ("WARN" if warning else "FAIL")
-        self.results.append({"check": name, "result": level, "detail": detail})
+        endpoint, expected, fix = guidance(name)
+        item = {"check": name, "result": level, "detail": detail, "endpoint": endpoint}
+        if level != "PASS":
+            item.update({"expected": expected, "fix": fix})
+        self.results.append(item)
 
     @property
     def failed(self):
         return any(item["result"] == "FAIL" for item in self.results)
+
+    def counts(self):
+        return {level: sum(item["result"] == level for item in self.results) for level in ("PASS", "WARN", "FAIL")}
+
+
+class ProviderUnreachable(Exception):
+    """The provider could not be reached at all (DNS, TCP, TLS or timeout)."""
 
 
 class Client:
@@ -115,6 +200,8 @@ class Client:
             raw = connection.getresponse()
             data = raw.read(MAX_RESPONSE + 1)
             return Response(raw.status, {k.lower(): v for k, v in raw.getheaders()}, data)
+        except (OSError, http.client.HTTPException) as error:
+            raise ProviderUnreachable(f"{method} {self.prefix + path}: {type(error).__name__}: {error}") from None
         finally:
             connection.close()
 
@@ -134,6 +221,9 @@ def check_common(report: Report, name: str, response: Response):
         report.add(f"{name}: no redirects", False, f"HTTP {response.status}; providers must never redirect")
     if len(response.body) > MAX_RESPONSE:
         report.add(f"{name}: response size", False, "response exceeds 102,400 bytes")
+    if response.body and not response.headers.get("content-type", "").lower().startswith("application/json"):
+        report.add(f"{name}: response Content-Type is application/json", False,
+                   f"Content-Type {response.headers.get('content-type')!r}", warning=True)
     if "no-store" not in response.headers.get("cache-control", ""):
         report.add(f"{name}: Cache-Control no-store", False, "recommended on every response", warning=True)
 
@@ -214,6 +304,12 @@ def check_result(client: Client, report: Report, job_id: str, state: str):
                                      and (review_url.startswith("https://")
                                           or (review_url.startswith("/") and not review_url.startswith("//"))))))
     report.add("result envelope matches the protocol", ok, f"HTTP {response.status}, keys {sorted(payload or {})}")
+    if ok and isinstance(review_url, str) and review_url.startswith("https://"):
+        link = urllib.parse.urlsplit(review_url)
+        base = client.parsed
+        same = (link.hostname or "").lower() == (base.hostname or "").lower() \
+            and (link.port or 443) == (base.port or (443 if base.scheme == "https" else 80))
+        report.add("reviewUrl is on the provider origin", same, f"reviewUrl host {link.hostname}", warning=True)
     report.add("result stays within 102,400 bytes", len(response.body) <= MAX_RESPONSE, f"{len(response.body)} bytes")
 
 
@@ -235,16 +331,40 @@ def main(argv=None) -> int:
         raise SystemExit(f"Set {args.token_env} to the provider token (it is never printed).")
     client = Client(args.base_url, token, args.auth_header, args.auth_scheme, args.allow_insecure_http, args.timeout)
     report = Report()
-    check_connection(client, report)
-    if not args.connection_only:
-        check_lifecycle(client, report, args.document_type, args.deadline)
+    try:
+        check_connection(client, report)
+        if not args.connection_only:
+            check_lifecycle(client, report, args.document_type, args.deadline)
+    except ProviderUnreachable as error:
+        message = (f"Cannot reach the provider ({error}). Check that it is running, that --base-url is correct "
+                   "and, for https://, that the certificate is valid for the host and issued by a public CA "
+                   "(Salesforce requires one).")
+        if args.json:
+            print(json.dumps({"passed": False, "unreachable": True, "error": message, "results": report.results},
+                             indent=2))
+        else:
+            print(message, file=sys.stderr)
+        return 2
     if args.json:
-        print(json.dumps({"passed": not report.failed, "results": report.results}, indent=2))
+        print(json.dumps({"passed": not report.failed, "summary": report.counts(), "results": report.results},
+                         indent=2))
     else:
-        for item in report.results:
-            print(f"{item['result']:4}  {item['check']}" + (f"  ({item['detail']})" if item["detail"] else ""))
-        print("\nConformant." if not report.failed else "\nNot conformant: fix the FAIL lines above.")
+        print_report(report, args.base_url)
     return 1 if report.failed else 0
+
+
+def print_report(report: Report, base_url: str):
+    print(f"ScanForce Open /connect/v1 conformance: {base_url}\n")
+    for item in report.results:
+        print(f"{item['result']:4}  {item['check']}" + (f"  ({item['detail']})" if item["detail"] else ""))
+        if item["result"] != "PASS":
+            for label in ("endpoint", "expected", "fix"):
+                if item.get(label):
+                    print(f"      {label + ':':10}{item[label]}")
+    counts = report.counts()
+    print(f"\n{counts['PASS']} passed, {counts['WARN']} warnings, {counts['FAIL']} failed.")
+    print("Conformant." if not report.failed else
+          f"Not conformant: fix the FAIL lines above. Rules: {PROTOCOL}")
 
 
 if __name__ == "__main__":

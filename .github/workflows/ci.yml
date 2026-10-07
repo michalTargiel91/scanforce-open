@@ -58,8 +58,30 @@ jobs:
         run: |
           sf project convert source --root-dir force-app --output-dir "$RUNNER_TEMP/scanforce-open-metadata"
           sf project convert source --root-dir provider-config --output-dir "$RUNNER_TEMP/provider-config-metadata"
+          for example in field-mappings flows record-page; do
+            sf project convert source --root-dir "examples/$example" --output-dir "$RUNNER_TEMP/example-$example"
+          done
       - name: PMD security rules (no org required)
         run: sf code-analyzer run --workspace . --target force-app --rule-selector pmd:Security --severity-threshold 3
+
+  reference-provider:
+    name: Reference provider container conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the reference provider container
+        run: |
+          docker build -t scanforce-open-reference-provider examples/mock-provider
+          echo "PROVIDER_TOKEN=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" >> "$GITHUB_ENV"
+      - name: Run the conformance checker as a provider's CI would
+        run: |
+          docker run -d --rm --name reference-provider -p 127.0.0.1:8787:8787 \
+            -e MOCK_PROVIDER_TOKEN="$PROVIDER_TOKEN" scanforce-open-reference-provider
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:8787/ && break; sleep 1; done
+          for type in invoice review; do
+            python3 tools/provider-conformance/check_provider.py \
+              --base-url http://127.0.0.1:8787/connect --allow-insecure-http --document-type "$type" --deadline 30
+          done
 
   security:
     name: Secret scan and dependency audit

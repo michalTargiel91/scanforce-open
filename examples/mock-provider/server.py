@@ -123,6 +123,19 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def not_api(self):
+        """Outside /connect/v1: a plain 404, so a wrong base URL never looks like a provider."""
+        if self.path.startswith("/connect/v1/"):
+            return False
+        body = b"Not found"
+        self.send_response(404)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+        return True
+
     def error(self, status_code, code):
         self.send_json(status_code, {"error": {"code": code, "message": code, "retryable": False}})
 
@@ -200,6 +213,8 @@ class Handler(BaseHTTPRequestHandler):
         if review and review[2]:
             self.review(review, approve=True)
             return
+        if self.not_api():
+            return
         credential = self.credential()
         if credential is None:
             return
@@ -254,6 +269,8 @@ class Handler(BaseHTTPRequestHandler):
         if review and not review[2]:
             self.review(review, approve=False)
             return
+        if self.not_api():
+            return
         credential = self.credential()
         if credential is None:
             return
@@ -303,10 +320,12 @@ def make_server(address, token, db_path):
 
 
 if __name__ == "__main__":
-    server = make_server(("127.0.0.1", int(os.environ.get("PORT", "8787"))),
+    # Loopback by default. HOST=0.0.0.0 only inside a container or behind an HTTPS proxy you control.
+    host = os.environ.get("HOST", "127.0.0.1")
+    server = make_server((host, int(os.environ.get("PORT", "8787"))),
                          os.environ.get("MOCK_PROVIDER_TOKEN", ""),
                          os.environ.get("MOCK_PROVIDER_DB", "jobs.sqlite3"))
-    print(f"Mock provider listening on http://127.0.0.1:{server.server_address[1]} (no request logging).")
+    print(f"Mock provider listening on http://{host}:{server.server_address[1]} (no request logging).")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

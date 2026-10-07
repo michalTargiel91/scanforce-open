@@ -4,6 +4,7 @@ import io
 import json
 import os
 import secrets
+import socket
 import sys
 import tempfile
 import threading
@@ -64,6 +65,45 @@ class ConformanceAgainstMockTest(unittest.TestCase):
         self.assertEqual(code, 1)
         failed = {item["check"] for item in report["results"] if item["result"] == "FAIL"}
         self.assertIn("connection check returns 404 NOT_FOUND", failed)
+
+    def test_failures_explain_expected_behaviour_and_fix(self):
+        os.environ["CONFORMANCE_TEST_TOKEN"] = "x" * 40
+        code, report = self.run_check("--connection-only")
+        failure = next(item for item in report["results"] if item["result"] == "FAIL")
+        self.assertEqual(code, 1)
+        self.assertIn("/v1/jobs/", failure["endpoint"])
+        self.assertIn("404", failure["expected"])
+        self.assertIn("token", failure["fix"])
+
+    def test_human_output_lists_fix_and_summary(self):
+        os.environ["CONFORMANCE_TEST_TOKEN"] = "x" * 40
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = check_provider.main(["--base-url", self.base, "--token-env", "CONFORMANCE_TEST_TOKEN",
+                                        "--allow-insecure-http", "--connection-only"])
+        text = output.getvalue()
+        self.assertEqual(code, 1)
+        self.assertIn("fix:", text)
+        self.assertIn("failed.", text)
+        self.assertNotIn("x" * 40, text)
+
+    def test_wrong_base_url_is_not_conformant(self):
+        self.base = self.base.removesuffix("/connect")
+        code, report = self.run_check("--connection-only")
+        self.assertEqual(code, 1)
+        failed = {item["check"] for item in report["results"] if item["result"] == "FAIL"}
+        self.assertIn("connection check returns 404 NOT_FOUND", failed)
+
+    def test_unreachable_provider_exits_2_without_traceback(self):
+        with socket.socket() as probe:  # a port nothing listens on
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        self.base = f"http://127.0.0.1:{port}/connect"
+        code, report = self.run_check("--timeout", "2")
+        self.assertEqual(code, 2)
+        self.assertTrue(report["unreachable"])
+        self.assertIn("Cannot reach the provider", report["error"])
+        self.assertNotIn(self.token, json.dumps(report))
 
     def test_requires_https_unless_explicitly_local(self):
         with self.assertRaises(SystemExit):

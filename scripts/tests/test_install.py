@@ -14,6 +14,7 @@ import json, os, sys
 from pathlib import Path
 args = sys.argv[1:]
 mode = os.environ.get("FAKE_MODE", "fresh")
+exit_code = 0
 record = {"args": args}
 if args[:3] == ["project", "deploy", "start"]:
     source = args[args.index("--source-dir") + 1]
@@ -31,7 +32,14 @@ elif args[:2] == ["data", "query"]:
     records = [{"Id": "0XA000000000001"}] if mode == "existing" else []
     print(json.dumps({"status": 0, "result": {"records": records}}))
 elif args[:3] == ["org", "assign", "permset"]:
-    print(json.dumps({"status": 0}))
+    if mode == "permset_missing" and args[args.index("--name") + 1] == "SfdcDcx_Provider_Access":
+        print(json.dumps({"status": 1, "message": "Permission set not found in target org"}))
+        exit_code = 1
+    if mode == "permset_duplicate":
+        print(json.dumps({"status": 1, "result": {"failures": [{"message": "Duplicate PermissionSetAssignment"}]}}))
+        exit_code = 1
+    if not exit_code:
+        print(json.dumps({"status": 0}))
 elif args[:2] == ["apex", "run"]:
     record["apex"] = Path(args[args.index("--file") + 1]).read_text()
     print(json.dumps({"status": 0, "result": {"success": True, "compiled": True}}))
@@ -39,6 +47,7 @@ else:
     raise SystemExit("Unexpected command " + repr(args))
 with open(os.environ["FAKE_LOG"], "a") as log:
     log.write(json.dumps(record) + "\n")
+sys.exit(exit_code)
 """
 
 
@@ -111,6 +120,24 @@ class InstallScriptTest(unittest.TestCase):
                 run, calls, _, _ = self.run_install(*args)
                 self.assertNotEqual(run.returncode, 0)
                 self.assertEqual(calls, [])
+
+    def test_missing_permission_set_is_reported_not_claimed(self):
+        run, _, _, _ = self.run_install("--target-org", "demo", mode="permset_missing")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertNotIn("Assigned ScanForce Open Administrator", run.stdout)
+        self.assertIn("could not assign SfdcDcx_Provider_Access", run.stderr)
+
+    def test_existing_assignments_count_as_assigned(self):
+        run, _, _, _ = self.run_install("--target-org", "demo", mode="permset_duplicate")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("Assigned ScanForce Open Administrator", run.stdout)
+
+    def test_missing_option_value_and_endpoint_path_hint(self):
+        run, calls, _, _ = self.run_install("--target-org")
+        self.assertEqual(run.returncode, 2)
+        self.assertEqual(calls, [])
+        run, _, _, _ = self.run_install("--target-org", "demo", "--endpoint", "https://provider.example.com")
+        self.assertIn("does not end in /connect", run.stderr)
 
     def test_failed_deployment_stops_before_credentials(self):
         run, calls, _, _ = self.run_install("--target-org", "demo", mode="deploy_failed")
