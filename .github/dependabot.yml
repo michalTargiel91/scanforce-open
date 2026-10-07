@@ -1,12 +1,20 @@
 version: 2
 updates:
   # Development toolchain only; nothing from npm is deployed to Salesforce.
+  # A dependency joins the FIRST group it matches, so keep the specific groups on top.
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # A Babel major must move @babel/core and @babel/eslint-parser together; separate PRs can never pass.
+      babel:
+        patterns: ["@babel/*"]
+      # Pinned exactly on purpose: a new Prettier can reformat force-app, so it needs its own
+      # reviewed reformat commit and must never hold back the routine updates below.
+      formatter:
+        patterns: ["prettier", "prettier-plugin-apex"]
       npm-minor-and-patch:
         update-types: [minor, patch]
   - package-ecosystem: github-actions
