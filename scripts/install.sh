@@ -9,6 +9,10 @@
 # recovery schedule. It never asks for, reads or prints a provider secret: enter
 # the API key afterwards on the ScanForce Open Configuration page or in Setup.
 set -euo pipefail
+# FORCE_COLOR (set by many CI systems and terminals, and it beats NO_COLOR) makes `sf --json` print
+# colour codes inside the JSON, which no parser accepts. Run the CLI without colour.
+unset FORCE_COLOR
+export NO_COLOR=1
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 usage() {
@@ -69,14 +73,18 @@ command -v sf >/dev/null || { echo 'Salesforce CLI (sf) is required.' >&2; exit 
 json_ok() {
   python3 -c '
 import json, sys
-reply = json.load(sys.stdin)
+try:
+    reply = json.load(sys.stdin)
+except ValueError:
+    sys.stderr.write("install.sh could not read the Salesforce CLI output as JSON. Check that `sf` is not wrapped or aliased and that `sf --version` works.\n")
+    sys.exit(1)
 result = reply.get("result") or {}
 ok = reply.get("status") == 0 and (not isinstance(result, dict) or result.get("success", True) is not False)
 sys.exit(0 if ok else 1)'
 }
 
 echo "Checking authentication for $target_org"
-sf org display --target-org "$target_org" --json | json_ok || { echo "Not authenticated to $target_org" >&2; exit 1; }
+sf org display --target-org "$target_org" --json | json_ok || { echo "Not authenticated to $target_org (or its status could not be read, see above)" >&2; exit 1; }
 
 if [[ "$allow_pending" == 1 ]]; then
   # Scheduled recovery and queued processing jobs otherwise block redeploying their classes.

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# FORCE_COLOR (set by many CI systems and terminals, and it beats NO_COLOR) makes `sf --json` print
+# colour codes inside the JSON, which no parser accepts. Run the CLI without colour.
+unset FORCE_COLOR
+export NO_COLOR=1
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 : "${DEV_HUB_ALIAS:?Set DEV_HUB_ALIAS to the authorized Dev Hub alias}"
 case "${KEEP_SCRATCH:-0}" in 0|1) ;; *) echo 'KEEP_SCRATCH must be 0 or 1' >&2; exit 1 ;; esac

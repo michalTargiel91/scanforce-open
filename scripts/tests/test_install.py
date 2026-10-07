@@ -16,6 +16,15 @@ args = sys.argv[1:]
 mode = os.environ.get("FAKE_MODE", "fresh")
 exit_code = 0
 record = {"args": args}
+
+
+def emit(payload):
+    text = json.dumps(payload)
+    forced = os.environ.get("FORCE_COLOR", "") not in ("", "0", "false")
+    # The real CLI wraps JSON tokens in ANSI colour codes when FORCE_COLOR is set; NO_COLOR does not override it.
+    print("\x1b[97m" + text[0] + "\x1b[39m" + text[1:] if forced else text)
+
+
 if args[:3] == ["project", "deploy", "start"]:
     source = args[args.index("--source-dir") + 1]
     record["source"] = source
@@ -25,24 +34,26 @@ if args[:3] == ["project", "deploy", "start"]:
     failed = mode in ("deploy_failed", "pending_jobs") and source == "force-app"
     message = "This schedulable class has jobs pending or in progress" if mode == "pending_jobs" else "failed"
     record["settings"] = (Path(source) / "settings" / "Deployment.settings-meta.xml").exists()
-    print(json.dumps({"status": 1 if failed else 0, "message": message if failed else "", "result": {"success": not failed}}))
+    emit({"status": 1 if failed else 0, "message": message if failed else "", "result": {"success": not failed}})
+elif args[:2] == ["org", "display"] and mode == "garbled_json":
+    print("not json at all")
 elif args[:2] == ["org", "display"]:
-    print(json.dumps({"status": 0, "result": {"id": "00D000000000001"}}))
+    emit({"status": 0, "result": {"id": "00D000000000001"}})
 elif args[:2] == ["data", "query"]:
     records = [{"Id": "0XA000000000001"}] if mode == "existing" else []
-    print(json.dumps({"status": 0, "result": {"records": records}}))
+    emit({"status": 0, "result": {"records": records}})
 elif args[:3] == ["org", "assign", "permset"]:
     if mode == "permset_missing" and args[args.index("--name") + 1] == "SfdcDcx_Provider_Access":
-        print(json.dumps({"status": 1, "message": "Permission set not found in target org"}))
+        emit({"status": 1, "message": "Permission set not found in target org"})
         exit_code = 1
     if mode == "permset_duplicate":
-        print(json.dumps({"status": 1, "result": {"failures": [{"message": "Duplicate PermissionSetAssignment"}]}}))
+        emit({"status": 1, "result": {"failures": [{"message": "Duplicate PermissionSetAssignment"}]}})
         exit_code = 1
     if not exit_code:
-        print(json.dumps({"status": 0}))
+        emit({"status": 0})
 elif args[:2] == ["apex", "run"]:
     record["apex"] = Path(args[args.index("--file") + 1]).read_text()
-    print(json.dumps({"status": 0, "result": {"success": True, "compiled": True}}))
+    emit({"status": 0, "result": {"success": True, "compiled": True}})
 else:
     raise SystemExit("Unexpected command " + repr(args))
 with open(os.environ["FAKE_LOG"], "a") as log:
@@ -52,7 +63,7 @@ sys.exit(exit_code)
 
 
 class InstallScriptTest(unittest.TestCase):
-    def run_install(self, *args, mode="fresh"):
+    def run_install(self, *args, mode="fresh", env_extra=None):
         with tempfile.TemporaryDirectory() as directory:
             tmp = Path(directory)
             project = tmp / "project"
@@ -64,7 +75,8 @@ class InstallScriptTest(unittest.TestCase):
             fake.mkdir()
             (fake / "sf").write_text(FAKE_SF)
             (fake / "sf").chmod(0o755)
-            env = {**os.environ, "PATH": f"{fake}:{os.environ['PATH']}", "FAKE_LOG": str(tmp / "calls"), "FAKE_MODE": mode}
+            base = {k: v for k, v in os.environ.items() if k not in ("FORCE_COLOR", "NO_COLOR")}  # a test sets these itself
+            env = {**base, "PATH": f"{fake}:{os.environ['PATH']}", "FAKE_LOG": str(tmp / "calls"), "FAKE_MODE": mode, **(env_extra or {})}
             run = subprocess.run(["bash", "scripts/install.sh", *args], cwd=project, env=env, text=True, capture_output=True)
             calls = [json.loads(line) for line in (tmp / "calls").read_text().splitlines()] if (tmp / "calls").exists() else []
             leftover = (project / "provider-config-install").exists()
@@ -131,6 +143,19 @@ class InstallScriptTest(unittest.TestCase):
         run, _, _, _ = self.run_install("--target-org", "demo", mode="permset_duplicate")
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn("Assigned ScanForce Open Administrator", run.stdout)
+
+    def test_force_color_does_not_break_cli_json_parsing(self):
+        # FORCE_COLOR is common in CI and terminals and makes `sf --json` print coloured, unparseable JSON.
+        run, calls, _, _ = self.run_install("--target-org", "demo", env_extra={"FORCE_COLOR": "3", "NO_COLOR": ""})
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("ScanForce Open is installed", run.stdout)
+        self.assertTrue(any("source" in call for call in calls))
+
+    def test_unparseable_cli_output_is_explained_not_a_traceback(self):
+        run, _, _, _ = self.run_install("--target-org", "demo", mode="garbled_json")
+        self.assertNotEqual(run.returncode, 0)
+        self.assertNotIn("Traceback", run.stderr)
+        self.assertIn("could not read the Salesforce CLI output", run.stderr)
 
     def test_missing_option_value_and_endpoint_path_hint(self):
         run, calls, _, _ = self.run_install("--target-org")

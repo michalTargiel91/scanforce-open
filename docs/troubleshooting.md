@@ -15,6 +15,7 @@ or usernames. See [SUPPORT.md](../SUPPORT.md).
 | Symptom | Cause and fix |
 |---|---|
 | `install.sh` stops at *Checking authentication* | The alias is not logged in. Run `sf org login web --alias my-org` (sandboxes: `--instance-url https://test.salesforce.com`) and check with `sf org display --target-org my-org`. |
+| `install.sh` fails with a Python `JSONDecodeError` or *Not authenticated* although `sf org display` works | An older checkout and `FORCE_COLOR` set in your environment (common in CI and some terminals): the CLI then colours its JSON. Current scripts clear it. On an older checkout run `env -u FORCE_COLOR NO_COLOR=1 bash scripts/install.sh …`. |
 | `python3: command not found` | Install Python 3.10 or later. The script uses it only to read CLI output. |
 | Deployment fails in **your own** Apex tests | `RunLocalTests` runs every local test in the org, including existing ones. Fix or deactivate the failing tests. In sandboxes and scratch orgs you can use `--test-level NoTestRun`. Production requires tests. |
 | Deployment fails because Apex jobs are pending | Any re-run of `install.sh` once recovery is installed (and upgrades): add `--allow-pending-jobs`, or uninstall the recovery schedule first. See [install.md](install.md#upgrading). |
