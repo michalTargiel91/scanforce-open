@@ -4,8 +4,8 @@
  * Credential and never read back, logged or stored anywhere else.
  */
 public with sharing class SfdcDcx_ProviderConnection {
-  public static final String NAMED_CREDENTIAL = 'SfdcDcx_Provider';
-  public static final String EXTERNAL_CREDENTIAL = 'SfdcDcx_ProviderAuth';
+  public static final String ENDPOINT_API_NAME = 'SfdcDcx_Provider';
+  public static final String AUTH_API_NAME = 'SfdcDcx_ProviderAuth';
   public static final String PRINCIPAL = 'Provider';
   public static final String TOKEN_PARAMETER = 'Token';
   public static final String PROBE_JOB_ID = 'scanforce-open-connection-check';
@@ -109,7 +109,7 @@ public with sharing class SfdcDcx_ProviderConnection {
     HttpRequest request = new HttpRequest();
     request.setMethod('GET');
     request.setEndpoint(
-      'callout:' + NAMED_CREDENTIAL + '/v1/jobs/' + PROBE_JOB_ID
+      'callout:' + ENDPOINT_API_NAME + '/v1/jobs/' + PROBE_JOB_ID
     );
     request.setHeader('Accept', 'application/json');
     request.setHeader(
@@ -181,7 +181,7 @@ public with sharing class SfdcDcx_ProviderConnection {
       State state = new State();
       try {
         ConnectApi.NamedCredential named = ConnectApi.NamedCredentials.getNamedCredential(
-          NAMED_CREDENTIAL
+          ENDPOINT_API_NAME
         );
         state.namedCredentialExists = true;
         state.endpointUrl = named.calloutUrl;
@@ -190,7 +190,7 @@ public with sharing class SfdcDcx_ProviderConnection {
       }
       try {
         ConnectApi.ExternalCredential external = ConnectApi.NamedCredentials.getExternalCredential(
-          EXTERNAL_CREDENTIAL
+          AUTH_API_NAME
         );
         state.externalCredentialExists = true;
         state.authenticationProtocol = String.valueOf(
@@ -213,7 +213,7 @@ public with sharing class SfdcDcx_ProviderConnection {
       if (state.principalExists)
         try {
           ConnectApi.Credential credential = ConnectApi.NamedCredentials.getCredential(
-            EXTERNAL_CREDENTIAL,
+            AUTH_API_NAME,
             PRINCIPAL,
             ConnectApi.CredentialPrincipalType.NamedPrincipal
           );
@@ -228,10 +228,10 @@ public with sharing class SfdcDcx_ProviderConnection {
 
     public void updateEndpoint(String url) {
       ConnectApi.NamedCredential current = ConnectApi.NamedCredentials.getNamedCredential(
-        NAMED_CREDENTIAL
+        ENDPOINT_API_NAME
       );
       ConnectApi.NamedCredentialInput input = new ConnectApi.NamedCredentialInput();
-      input.developerName = NAMED_CREDENTIAL;
+      input.developerName = ENDPOINT_API_NAME;
       input.masterLabel = current.masterLabel;
       input.type = ConnectApi.NamedCredentialType.SecuredEndpoint;
       input.calloutUrl = url;
@@ -247,14 +247,14 @@ public with sharing class SfdcDcx_ProviderConnection {
       options.generateAuthorizationHeader = current.calloutOptions.generateAuthorizationHeader;
       input.calloutOptions = options;
       ConnectApi.NamedCredentials.updateNamedCredential(
-        NAMED_CREDENTIAL,
+        ENDPOINT_API_NAME,
         input
       );
     }
 
     public void clearToken() {
       ConnectApi.NamedCredentials.deleteCredential(
-        EXTERNAL_CREDENTIAL,
+        AUTH_API_NAME,
         PRINCIPAL,
         ConnectApi.CredentialPrincipalType.NamedPrincipal
       );
@@ -262,7 +262,7 @@ public with sharing class SfdcDcx_ProviderConnection {
 
     public void storeToken(String token, Boolean replace) {
       ConnectApi.CredentialInput input = new ConnectApi.CredentialInput();
-      input.externalCredential = EXTERNAL_CREDENTIAL;
+      input.externalCredential = AUTH_API_NAME;
       input.principalName = PRINCIPAL;
       input.principalType = ConnectApi.CredentialPrincipalType.NamedPrincipal;
       input.authenticationProtocol = ConnectApi.CredentialAuthenticationProtocol.Custom;

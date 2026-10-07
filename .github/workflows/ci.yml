@@ -53,7 +53,7 @@ jobs:
       - name: Install Salesforce CLI and Code Analyzer
         run: |
           npm install --global @salesforce/cli@2.151.7
-          sf plugins install @salesforce/plugin-code-analyzer@5.7.1
+          sf plugins install @salesforce/plugin-code-analyzer@5.16.0
       - name: Convert source (metadata structure)
         run: |
           sf project convert source --root-dir force-app --output-dir "$RUNNER_TEMP/scanforce-open-metadata"

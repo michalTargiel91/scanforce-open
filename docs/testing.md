@@ -24,7 +24,7 @@ npm test              # Jest for all LWCs + Python suites
 Static security analysis (needs Java 21 and the Salesforce CLI):
 
 ```bash
-sf plugins install @salesforce/plugin-code-analyzer@5.7.1
+sf plugins install @salesforce/plugin-code-analyzer@5.16.0
 sf code-analyzer run --workspace . --target force-app --rule-selector pmd:Security --severity-threshold 3
 docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --redact --no-banner
 ```

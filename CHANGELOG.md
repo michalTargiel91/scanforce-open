@@ -3,7 +3,7 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## 1.0.0-rc.1 — release candidate (not yet tagged)
+## 1.0.0-rc.1 — 2026-10-07 (release candidate)
 
 First public release of ScanForce Open, the open-source successor to the
 original ScanForce, built on a provider-neutral document-connector core
@@ -63,6 +63,26 @@ but never published separately.
 * Install script that never overwrites credentials or handles secrets.
 * Public CI: lint, formatting, Jest, Python suites, metadata guardrails,
   Salesforce Code Analyzer security rules, secret scan, dependency audit.
+
+### Validation
+
+* Local lane: ESLint, Prettier, Jest (all LWCs), Python suites (mock provider,
+  conformance checker, install and architecture checks), metadata guardrails,
+  Salesforce Code Analyzer `pmd:Security` (0 findings) and gitleaks (tree and
+  history clean).
+* Scratch gate on API 67 from a fresh clone: all 122 Apex test methods passed,
+  91 % coverage. Clean install with `scripts/install.sh --provider docsolved
+  --with-examples` into a fresh scratch org.
+* In-org UI checks with synthetic data: upload and automatic submission,
+  bounded retry against an unreachable provider, field mapping preview and
+  apply, Review Required actions, configuration journey, record-page upload.
+  A real HTTPS connection test reached `https://docsolved.ai/connect` through
+  the Named Credential and was classified *Authentication failed* (no key
+  stored, no document sent).
+* **Known gap:** the end-to-end HTTPS processing smoke (testing guide, lane 3)
+  against a live provider was not run for this candidate; it must pass before
+  1.0.0. Provider behaviour is covered by Apex callout mocks and by the mock
+  provider and conformance suites.
 
 ### Not included
 
