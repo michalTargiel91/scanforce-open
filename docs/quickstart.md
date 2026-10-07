@@ -9,16 +9,17 @@ a first processed document. It has four parts:
 * **C.** Process your first document.
 * **D.** Troubleshoot if something is not green.
 
-Plan about 15 minutes with DocSolved.ai, plus the time to deploy an HTTPS
-endpoint if you bring your own provider.
+Plan about 15 minutes once you have a provider: a DocSolved.ai key (issued on
+request, so ask early) or an HTTPS endpoint. Deploying the reference provider
+for a first evaluation adds about as much again.
 
 ## Before you start
 
 | You need | Notes |
 |---|---|
-| A Salesforce org | Lightning Experience, Salesforce Files and Apex, API 67.0 (Summer '26) or later. A free [Developer Edition](https://developer.salesforce.com/signup), a sandbox or a scratch org is ideal for a first try. |
+| A Salesforce org | Lightning Experience, Salesforce Files and Apex, API 67.0 (Summer '26) or later. A free [Developer Edition](https://developer.salesforce.com/signup), a sandbox or a scratch org is ideal for a first try. With a Dev Hub: `sf org create scratch --target-dev-hub my-hub --definition-file config/project-scratch-def.json --alias my-org --duration-days 7` (after cloning, below). |
 | System Administrator access | To deploy metadata, manage Named/External Credentials, assign permission sets and schedule Apex. |
-| [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`), Git, Python 3.10+ | Python is used by the install script only. |
+| [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf` 2.x; CI tests with 2.151.7), Git, Bash, Python 3 | The install script is Bash and uses `python3` to read CLI output. Python 3.10+ runs the reference provider's checker and tools. |
 | A provider | DocSolved.ai key **or** a `/connect/v1` endpoint on public HTTPS. You can install first and connect later. |
 
 ## A. Install in Salesforce
@@ -91,7 +92,7 @@ the same way. If you already have one, skip to step 3.
 **1. Get an HTTPS endpoint.** Salesforce runs in the cloud. It can only call a
 URL on the public internet with a certificate from a public certificate
 authority. `http://localhost` on your laptop is **not** reachable from
-Salesforce.
+Salesforce, and neither is a private network address.
 
 To evaluate without writing a provider, run the
 [reference provider](../examples/mock-provider/README.md) (synthetic results
@@ -104,9 +105,11 @@ docker build -t scanforce-open-reference-provider examples/mock-provider
 python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 ```
 
-Deploy the image, set the environment variable `MOCK_PROVIDER_TOKEN` from
-your platform's secret store, and let the platform terminate HTTPS. The
-container listens on `PORT` (default 8787). Your base URL is then
+Deploy the image to a host that gives it a public HTTPS URL, set the
+environment variable `MOCK_PROVIDER_TOKEN` from the host's secret store, and
+keep it to **one running instance**. The
+[reference provider README](../examples/mock-provider/README.md#in-a-container-for-salesforce)
+lists exactly what the host must do. Your base URL is then
 `https://YOUR-HOST/connect`. Check it from your machine before touching
 Salesforce:
 
@@ -130,9 +133,9 @@ conformance command.
 1. **Step 1:** choose **Custom provider**. **Step 2:** enter
    `https://YOUR-HOST/connect` and choose **Save endpoint**.
 2. **Step 3:** paste the provider token and choose **Store API key**. It is
-   sent as `Authorization: Bearer <token>`. For OAuth client credentials, a
-   custom header or mTLS, configure the External Credential in Setup instead
-   ([configuration](configuration.md#provider-credentials)).
+   sent as `Authorization: Bearer <token>`. For a raw key in another header or
+   HTTP Basic, change the External Credential in Setup instead
+   ([configuration](configuration.md#authentication-schemes)).
 3. **Steps 4 and 5:** grant provider access and install recovery.
 4. **Step 6:** **Test connection** → **Connected**.
 
@@ -142,7 +145,8 @@ conformance command.
 2. **Document type:**
    * DocSolved.ai: keep **Automatic**. The provider classifies the document.
    * Reference provider: choose **Other…** and enter `invoice` to get its
-     synthetic invoice. Enter `review` instead to try the Review Required flow.
+     synthetic invoice (after `--with-examples`, `invoice` is already in the
+     list). Enter `review` instead to try the Review Required flow.
 3. **Upload Files** and choose a PDF, PNG or JPEG of up to 5 MiB. With the
    reference provider, use only synthetic files such as
    [`examples/demo/synthetic-invoice.pdf`](../examples/demo/README.md).
@@ -160,8 +164,8 @@ synthetic result**.
 **Next steps:**
 
 * Give document users **ScanForce Open User** and **ScanForce Open Provider
-  Access**. Configuration step 4 can grant Provider Access to every ScanForce
-  Open user in one click.
+  Access**. Configuration step 4 can grant Provider Access to ScanForce
+  Open users who lack it, up to 200 per click.
 * Put the **ScanForce Open Record Documents** card on a record page (Lightning
   App Builder). It attaches files to the record and processes them with the
   record as source.

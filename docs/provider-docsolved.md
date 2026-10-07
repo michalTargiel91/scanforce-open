@@ -18,19 +18,31 @@ ScanForce Open authenticates to DocSolved.ai with a **workspace service key**
 * it belongs to your DocSolved.ai workspace, not to a person, so Salesforce
   keeps working when the administrator who created it leaves, and rotating it
   keeps the same workspace identity (in-flight retries still find their jobs);
-* the `connector` scope opens the `/connect/v1` endpoints and nothing else: the
-  key cannot browse your DocSolved.ai history, manage webhooks, call other APIs
-  or act as a user or administrator;
+* the `connector` scope opens the `/connect/v1` endpoints. A key issued with
+  only that scope cannot browse your DocSolved.ai history, manage webhooks,
+  run extraction through the other APIs or act as a user or administrator. Like
+  any DocSolved.ai key, it can read its own read-only usage counter;
 * results of jobs submitted from Salesforce land in that workspace, where its
   review and approval policy applies.
 
-A workspace owner or administrator creates the key. If the API key form in
-your account does not offer the `connector` scope or a workspace (the
-standard Developer Settings form currently does not), ask DocSolved.ai to
-issue one for your workspace: email [hello@synairo.com](mailto:hello@synairo.com)
-with your workspace name. Never send the key itself by email. Copy the key
-once; DocSolved.ai shows it only at creation. Do not paste it into chat,
-tickets, source control or Salesforce fields other than the step below.
+A workspace owner or administrator authorises the key. Today connector keys
+are **issued on request**: the standard Developer Settings form does not offer
+the `connector` scope or a workspace choice. Issuance is manual, so ask early
+and, meanwhile, evaluate ScanForce Open with the
+[reference provider](../examples/mock-provider/README.md) (switching providers
+later is a configuration change). Write from the address of a workspace owner or
+administrator to [hello@synairo.com](mailto:hello@synairo.com):
+
+```text
+Subject: ScanForce Open connector key
+Workspace: <your DocSolved.ai workspace name>
+Request: one workspace service key with only the connector scope,
+         for ScanForce Open (Salesforce).
+```
+
+Never send the key itself by email. Copy the key once; DocSolved.ai shows it
+only at creation. Do not paste it into chat, tickets, source control or
+Salesforce fields other than the step below.
 
 ## 2. Configure Salesforce
 
@@ -82,9 +94,10 @@ Prefer Setup over the Configuration page? Follow
   DocSolved.ai sign-in.
 * **Idempotency.** Retries with the same key return the original job and are not
   charged again. Workspace keys keep the same identity across key rotation.
-* **Usage and quotas** follow your DocSolved.ai plan. A used-up quota appears in
-  Salesforce as `PROVIDER_QUOTA_EXCEEDED`, a billing problem as
-  `PROVIDER_BILLING_FAILED`.
+* **Usage and quotas** are set by DocSolved.ai. Ask which plan covers the
+  connector key of your workspace before you process production volume. A
+  used-up quota appears in Salesforce as `PROVIDER_QUOTA_EXCEEDED`, a billing
+  problem as `PROVIDER_BILLING_FAILED`.
 * **Data.** Salesforce sends only the file bytes and the headers listed in the
   protocol. DocSolved.ai never receives Salesforce credentials and never calls
   Salesforce. See DocSolved.ai's own documentation and agreements for its

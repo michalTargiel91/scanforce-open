@@ -26,7 +26,7 @@ yourself.
 | Question | Answer |
 |---|---|
 | What does it run on? | Your Salesforce org: Lightning app, Apex, LWC, Flow actions, custom metadata. No Connected App, integration user or public file links. |
-| Do I need DocSolved.ai? | **No.** DocSolved.ai is the maintained hosted provider and the shortest path, but any service implementing `/connect/v1` works the same way. Switching is a configuration change. |
+| Do I need DocSolved.ai? | **No.** DocSolved.ai is the maintained hosted provider (connector keys are currently issued on request), but any service implementing `/connect/v1` works the same way. Switching is a configuration change. |
 | Can I use my own backend? | Yes: three HTTPS endpoints. There is a [dependency-free reference provider](examples/mock-provider/README.md) and a [conformance checker](tools/provider-conformance/README.md). |
 | How do I install it? | From source with the Salesforce CLI and one script (a few minutes, including Apex tests). See the [quickstart](docs/quickstart.md). |
 | What do I need? | A Salesforce org with Lightning, Files and Apex (Developer Edition, sandbox, scratch org, or Enterprise and above), System Administrator access, Salesforce CLI, Python 3.10+, and a provider endpoint. |
@@ -109,11 +109,11 @@ run the [conformance checker](tools/provider-conformance/README.md) locally or i
 | What it is | Maintained hosted document-intelligence service (OCR, classification, extraction, review screens) | Any HTTPS service implementing [`/connect/v1`](docs/provider-protocol.md): your OCR stack, a document AI product you license, another vendor |
 | What you need | A DocSolved.ai workspace key with only the `connector` scope | An endpoint reachable from Salesforce over public HTTPS, plus a credential |
 | Endpoint | `https://docsolved.ai/connect` | `https://your-host/connect` |
-| Authentication | Bearer API key in the External Credential | Bearer key, custom header, OAuth client credentials or mTLS, all through the External Credential |
+| Authentication | Bearer API key in the External Credential | Bearer key (default), a raw key in another header, or HTTP Basic, all through the External Credential. OAuth 2.0 and mTLS are untested ([details](docs/configuration.md#authentication-schemes)). |
 | Guide | [docs/provider-docsolved.md](docs/provider-docsolved.md) | [docs/provider-custom.md](docs/provider-custom.md) |
 
-Both use the same Salesforce code, states and UI. Nothing in ScanForce Open is
-DocSolved.ai-specific beyond a configuration preset.
+Both use the same Salesforce code, states and UI. DocSolved.ai-specific parts
+are limited to a preset URL and some wording on the Configuration page.
 
 ## Supported files and limits
 

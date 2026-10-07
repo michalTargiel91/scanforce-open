@@ -33,8 +33,8 @@
 ```
 
 The Salesforce side knows nothing provider-specific: one Named Credential, one
-protocol, one set of states. The only place DocSolved.ai appears in code is the
-Configuration page's preset URL `https://docsolved.ai/connect`.
+protocol, one set of states. DocSolved.ai appears in code only as the Configuration
+page's preset URL `https://docsolved.ai/connect` and the wording around it.
 
 ## Data model
 

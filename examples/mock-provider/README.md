@@ -19,10 +19,13 @@ export MOCK_PROVIDER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_ur
 python3 examples/mock-provider/server.py     # http://127.0.0.1:8787, no request logging
 ```
 
-Check it with the conformance checker in a second terminal:
+Check it with the conformance checker in a second terminal. A new terminal does
+not inherit the variable, so export the same token there (`export PROVIDER_TOKEN=…`
+with the value printed by `echo "$MOCK_PROVIDER_TOKEN"` in the first one):
 
 ```bash
-PROVIDER_TOKEN="$MOCK_PROVIDER_TOKEN" python3 tools/provider-conformance/check_provider.py \
+export PROVIDER_TOKEN='the same token'
+python3 tools/provider-conformance/check_provider.py \
   --base-url http://127.0.0.1:8787/connect --allow-insecure-http --document-type invoice
 ```
 
@@ -39,15 +42,27 @@ runs the provider as a non-root user on `0.0.0.0:$PORT`, for platforms that
 terminate HTTPS in front of the container:
 
 ```bash
+export MOCK_PROVIDER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"   # skip if already exported
 docker build -t scanforce-open-reference-provider examples/mock-provider
 docker run --rm -p 127.0.0.1:8787:8787 -e MOCK_PROVIDER_TOKEN scanforce-open-reference-provider  # local check
 ```
 
-On your hosting platform, set `MOCK_PROVIDER_TOKEN` from its secret store and
-configure `https://YOUR-HOST/connect` in ScanForce Open. Delete the deployment
-after your evaluation. The SQLite database lives in the container, so a
-restart forgets jobs, and Salesforce then reports them as invalid responses.
-Do not disable TLS validation anywhere.
+Any host that runs a container and puts public HTTPS in front of it works. The
+host must:
+
+| Requirement | Why |
+|---|---|
+| Build from `examples/mock-provider/Dockerfile` (build context: that directory) | The image needs only `server.py`. |
+| Provide a public HTTPS URL with a certificate from a public CA | Salesforce refuses plain HTTP, self-signed certificates and private addresses. |
+| Set `MOCK_PROVIDER_TOKEN` (20+ characters) from the host's secret store | The server refuses to start without it. It is also the Bearer key and the review-page password. |
+| Route to the container's port: `PORT` (default 8787, bound on `0.0.0.0`) | Many hosts inject `PORT`; the server honours it. |
+| Run **exactly one instance** and never scale to zero while a job is in progress | State is a SQLite file in the container. A second instance, a restart or an idle shutdown loses jobs, and Salesforce then reports them as invalid responses. |
+| Not rely on an HTTP health check that expects 200 | There is no health endpoint: `GET /` answers 404. Use a port check or none. |
+
+Then configure `https://YOUR-HOST/connect` in ScanForce Open and run the
+[conformance checker](../../tools/provider-conformance/README.md) against it
+first. Send **synthetic documents only**, and delete the deployment after your
+evaluation. Do not disable TLS validation anywhere.
 
 ## Read it in this order
 

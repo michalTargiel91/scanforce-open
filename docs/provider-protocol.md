@@ -280,9 +280,11 @@ Approval policy belongs to the provider; Salesforce only observes it.
 
 Authentication is configured by the Salesforce administrator in the External
 Credential `SfdcDcx_ProviderAuth`, never in ScanForce Open code. The default
-bootstrap sends `Authorization: Bearer <API key>`. Salesforce also supports
-OAuth 2.0 client credentials, custom headers such as `X-API-Key`, basic
-authentication and mutual TLS without any change to ScanForce Open. Providers:
+bootstrap sends `Authorization: Bearer <API key>`. A raw key in another header
+(such as `X-API-Key`) and HTTP Basic also work without any change to ScanForce
+Open ([configuration](configuration.md#authentication-schemes)); OAuth 2.0
+client credentials and mutual TLS are Salesforce features the maintainers have
+not tested. Providers:
 
 * MUST accept only HTTPS and validate credentials on every request, including
   the connection check, before looking anything up.

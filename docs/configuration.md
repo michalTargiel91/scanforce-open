@@ -68,7 +68,7 @@ shows readiness:
    the External Credential has no key; *Authentication failed* means the
    provider rejected the key.
 
-### In Setup (equivalent, and required for non-Bearer schemes)
+### In Setup (equivalent, and required to change the header or scheme)
 
 If you did not deploy `provider-config`, create the components manually in
 Setup → Named Credentials:
@@ -94,18 +94,100 @@ Setup → Named Credentials:
 `SfdcDcx_Provider_Access`), under **External Credential Principal Access**,
 enable `SfdcDcx_ProviderAuth - Provider` and assign it to users.
 
-Other authentication schemes need no code change:
+### Authentication schemes
 
-| Provider expects | External Credential setup |
-|---|---|
-| `Authorization: Bearer <key>` | The default above. |
-| A raw key in another header | Custom protocol; header name e.g. `X-API-Key`, formula `{!$Credential.SfdcDcx_ProviderAuth.Token}`. |
-| OAuth 2.0 client credentials | Protocol **OAuth 2.0**, flow **Client Credentials with Client Secret**, the provider's token URL and scope; principal `Provider`. |
-| Mutual TLS | Upload the client certificate in Certificate and Key Management and select it on the Named Credential. |
+ScanForce Open has no authentication code of its own: the External Credential
+adds the header, and ScanForce Open only calls `callout:SfdcDcx_Provider`. These
+schemes were verified in a Salesforce scratch org against a public HTTPS echo
+service (see [testing](testing.md#authentication-schemes)):
 
-In-app key entry (Configuration step 3) supports the Custom protocol with a
-`Token` parameter; manage the others in Setup. The connection test works for
-all of them.
+| Provider expects | Status | How |
+|---|---|---|
+| `Authorization: Bearer <key>` | Supported, the default | The bootstrap above. Enter the key on the Configuration page (step 3) or in Setup as the `Token` parameter. |
+| A raw key in another header, for example `X-API-Key: <key>` | Supported | [Edit the header](#raw-key-in-another-header), then enter the key as usual in step 3. |
+| HTTP Basic (user name and password) | Supported, Setup only | [Follow the Basic steps](#http-basic-authentication). |
+| OAuth 2.0 client credentials, mutual TLS | Not tested | Salesforce offers both, but the bootstrap and the Configuration page do not manage them and the maintainers have not tested them with ScanForce Open. See [other schemes](#other-schemes-untested). |
+
+In every case the credential lives only in the External Credential: never in
+custom metadata, source control or the Named Credential URL. The in-app key
+entry (Configuration step 3) writes the `Token` parameter of the `Provider`
+principal of a **Custom** External Credential, so it serves Bearer and raw-key
+headers. **Test connection** works for all schemes.
+
+#### Raw key in another header
+
+Setup → Named Credentials → **External Credentials** → *ScanForce Open Provider
+Auth* → **Custom Headers** → open the row menu of `Authorization` → **Edit**:
+
+* **Name**: `X-API-Key` (or the header your provider expects)
+* **Value**: `{!$Credential.SfdcDcx_ProviderAuth.Token}`
+
+Keep the `Token` parameter, then enter the key in Configuration step 3. Check
+the provider with
+`python3 tools/provider-conformance/check_provider.py --base-url … --auth-header X-API-Key --auth-scheme ""`.
+
+#### HTTP Basic authentication
+
+For providers that authenticate with a user name and password
+(`Authorization: Basic …`). Use a dedicated service account for the provider,
+only ever over HTTPS. A user name cannot contain a colon.
+
+1. Setup → Named Credentials → **External Credentials** → *ScanForce Open
+   Provider Auth*.
+2. **Custom Headers** → open the row menu of `Authorization` → **Edit**. Keep
+   the name and replace the **Value** with:
+
+   ```text
+   {!'Basic ' & BASE64ENCODE(BLOB($Credential.SfdcDcx_ProviderAuth.Username & ':' & $Credential.SfdcDcx_ProviderAuth.Password))}
+   ```
+
+3. **Principals** → open the row menu of `Provider` → **Edit** → under
+   **Authentication Parameters** choose **Add** twice: name `Username` with the
+   user name as value, and name `Password` with the password as value. Names are
+   case-sensitive. The values are masked while you type, stored encrypted by
+   Salesforce and never shown again. If a `Token` parameter is listed from an
+   earlier Bearer setup, delete it. Choose **Save**.
+4. Nothing to change for access: **ScanForce Open Provider Access** already
+   grants the `Provider` principal.
+5. In **ScanForce Open → Configuration** grant access, install recovery and
+   choose **Test connection**. **Connected** means the provider accepted the
+   credentials. Do not use step 3 (**Store API key**); it is for Bearer and
+   raw keys.
+
+Notes:
+
+* To rotate the password, edit the `Password` parameter in the same dialog.
+* Moving the endpoint to another provider origin on the Configuration page
+  removes the stored `Username` and `Password` first, like any other credential,
+  so they are never sent to the new host.
+* Right after switching to Basic, *Provider unreachable* from **Test connection**
+  usually means a parameter is missing or misspelled: Salesforce rejects the
+  header formula locally ("Field SfdcDcx_ProviderAuth.Username does not exist")
+  and sends nothing. For a missing Bearer key the page says *No API key stored*
+  instead.
+* Provider authors: check a Basic provider with
+  `PROVIDER_TOKEN="$(printf %s 'user:password' | base64 | tr -d '\n')" python3 tools/provider-conformance/check_provider.py --base-url … --auth-scheme Basic`.
+
+#### Other schemes (untested)
+
+OAuth 2.0 client credentials and mutual TLS are Salesforce External Credential
+features, not ScanForce Open features. The bootstrap uses the **Custom**
+protocol, and Salesforce can change an External Credential's protocol on
+deployment, but the maintainers have not tested these schemes with ScanForce
+Open, and the in-app key entry does not apply to them. If you need one,
+configure it in Setup, run **Test connection** and the
+[conformance checker](../tools/provider-conformance/README.md), and share what
+worked in [Discussions](https://github.com/michalTargiel91/scanforce-open/discussions).
+For mutual TLS, select the client certificate (Certificate and Key Management)
+on the **Named Credential**.
+
+#### Do not redeploy `provider-config` over a customised credential
+
+`scripts/install.sh` creates the bootstrap only when it does not exist and never
+overwrites it. Deploying the `provider-config` directory yourself replaces the
+Named Credential URL with the install placeholder and the External Credential
+with the Bearer formula, so a Basic or raw-key setup, and your endpoint, have to
+be set again.
 
 ## Recovery schedule
 

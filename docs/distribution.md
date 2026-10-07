@@ -33,9 +33,9 @@ not a commitment. Nothing here changes how you install today ([install.md](insta
 
 ## Recommendation
 
-**Next step: an unlocked package without a namespace**, published from
-the maintainers' Dev Hub alongside each source release. Source installation
-stays fully supported.
+**Recommended candidate for a next step (not a commitment): an unlocked package
+without a namespace**, published from the maintainers' Dev Hub alongside each
+source release. Source installation stays fully supported.
 
 Why:
 

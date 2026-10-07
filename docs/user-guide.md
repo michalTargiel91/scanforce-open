@@ -12,7 +12,7 @@ administrator if the app or its tabs are missing.
 2. **Document type**: keep *Automatic* unless your administrator told you to use
    a specific type (for example *invoice*). *Other…* lets you enter a type such
    as `purchase_order`.
-3. **Upload Files** (or drop files): PDF, PNG or JPEG, up to 5 MB (5 MiB) each, up to 25
+3. **Upload Files** (or drop files): PDF, PNG or JPEG, up to 5 MiB each, up to 25
    at once. With *Process automatically after upload* on, they are submitted
    right away. Uploaded files are private to you unless you share them.
 4. Or choose **Choose from Salesforce Files** to pick files you already have
@@ -68,7 +68,7 @@ applies.
 
 | You see | What to do |
 |---|---|
-| *Failed* with *File is too large* / *File type not supported* | Upload a PDF, PNG or JPEG under 5 MB. |
+| *Failed* with *File is too large* / *File type not supported* | Upload a PDF, PNG or JPEG of at most 5 MiB. |
 | *Provider rejected the credentials*, *Provider billing problem*, *quota used up* | Tell your administrator; then **Try again**. |
 | *Provider could not process the document* | Check the file is readable, then **Try again**. |
 | *Timed out* | **Try again**: ScanForce Open reconnects to the same provider job instead of sending the file twice. |

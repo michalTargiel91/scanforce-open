@@ -77,7 +77,7 @@ endpoint or authentication.
    API key, access, recovery, connection test). See [configuration](configuration.md).
 2. **Assign users**: give document users **ScanForce Open User** and
    **ScanForce Open Provider Access**. The Configuration page can grant provider
-   access to all ScanForce Open users in one click.
+   access to ScanForce Open users who lack it, up to 200 per click.
 3. **Optional**: add the **ScanForce Open Record Documents** component to record
    pages (Lightning App Builder → drag it onto an Account, Opportunity, Case or
    custom object page) and define [field mappings](developer.md#field-mappings).

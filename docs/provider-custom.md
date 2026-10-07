@@ -85,24 +85,29 @@ report protocol ambiguities with the **Provider compatibility** issue template.
    Credential `SfdcDcx_ProviderAuth`; you can pass your URL directly:
    `bash scripts/install.sh --target-org my-org --endpoint https://provider.example.com/connect`.
 2. Open **ScanForce Open → Configuration**, choose **Custom provider**, enter
-   the base URL ending in `/connect` and **Save endpoint**.
+   the base URL, the prefix before `/v1/jobs` (usually ending in `/connect`),
+   and **Save endpoint**.
 3. Authentication:
    * **API key as Bearer token** (default): paste the key in step 3 of the
      Configuration page. It is stored in the External Credential only.
-   * **Other schemes** (OAuth 2.0 client credentials, a custom header such as
-     `X-API-Key`, basic auth, mutual TLS): configure the External Credential
-     `SfdcDcx_ProviderAuth` in Setup → Named Credentials → External Credentials.
-     For a custom header, change the custom header name and formula, for example
-     header `X-API-Key` with formula `{!$Credential.SfdcDcx_ProviderAuth.Token}`.
-     No ScanForce Open code changes are required. See
-     [configuration](configuration.md#provider-credentials).
+   * **A raw key in another header** (for example `X-API-Key`), or **HTTP Basic**
+     (user name and password): both are supported and configured in the
+     External Credential in Setup. Exact steps:
+     [configuration](configuration.md#authentication-schemes). No ScanForce Open
+     code changes are required.
+   * **OAuth 2.0 client credentials** and **mutual TLS** are Salesforce features
+     that the maintainers have not tested with ScanForce Open
+     ([details](configuration.md#other-schemes-untested)).
 4. Grant provider access, install recovery and choose **Test connection**. A
    compatible provider shows **Connected**.
 
 Your provider must be reachable from Salesforce over public HTTPS with a
 certificate from a public certificate authority. For private networks use
 Salesforce's private connectivity options or an authenticated reverse proxy.
-Never point Salesforce at a public development tunnel with real documents.
+A temporary public HTTPS endpoint, such as the reference provider in a hosted
+container or behind a tunnel with a public certificate, is fine for **synthetic
+documents**. Never point Salesforce at a development tunnel, or at the reference
+provider, with real documents.
 
 ## Choosing document type hints
 

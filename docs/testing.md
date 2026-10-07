@@ -103,6 +103,30 @@ Tip: after redeploying components, Lightning may keep serving the previous
 bundle from the browser cache. Enable debug mode for the test user or clear the
 site data before checking UI changes.
 
+### Authentication schemes
+
+The Configuration page and the tests use the shipped Bearer bootstrap. The other
+documented schemes are verified by hand in a scratch org against a public HTTPS
+echo endpoint, so no provider is needed (use synthetic or demo credentials only):
+
+1. Install with `--endpoint` set to an echo URL such as `https://postman-echo.com/headers`
+   (it returns the request headers) or `https://postman-echo.com/basic-auth`
+   (HTTP 200 only for the published demo credentials `postman` / `password`).
+2. Change the External Credential as described in
+   [configuration](configuration.md#authentication-schemes) (raw key in
+   `X-API-Key`, or HTTP Basic with `Username` and `Password` parameters entered
+   in Setup).
+3. Run one callout through the Named Credential from Anonymous Apex
+   (`new HttpRequest()` with endpoint `callout:SfdcDcx_Provider`) and read the status
+   and body. Check that the header arrives, that a wrong password gives 401, that
+   *Test connection* without a stored credential gives the documented message, and
+   that moving the endpoint to another origin removes the stored parameters.
+
+Recorded for 1.0.1 (October 2026): Bearer (shipped formula), raw key in
+`X-API-Key` (Token stored through the Configuration page's Apex method) and HTTP
+Basic (parameters entered through the Setup UI) all authenticated; OAuth 2.0
+client credentials and mutual TLS were not tested.
+
 ## Release checklist
 
 - [ ] Local lane green, including code analyzer and secret scan.

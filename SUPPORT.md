@@ -12,7 +12,7 @@ channels so that answers help the next person too:
 | Suggest a feature | [Discussions → Ideas](https://github.com/michalTargiel91/scanforce-open/discussions/categories/ideas) or a feature request issue |
 | Report a bug or installation failure | [New issue](https://github.com/michalTargiel91/scanforce-open/issues/new/choose) |
 | Report a vulnerability | Privately, as described in [SECURITY.md](SECURITY.md). Never in a public issue. |
-| Get help with DocSolved.ai (keys, quotas, billing, review screens) | DocSolved.ai's own support channels, listed at [docsolved.ai](https://docsolved.ai) |
+| Get help with DocSolved.ai (connector key requests, quotas, billing, review screens) | [hello@synairo.com](mailto:hello@synairo.com) for connector keys ([how to ask](docs/provider-docsolved.md#1-get-a-docsolvedai-connector-key)); otherwise DocSolved.ai's own support channels, listed at [docsolved.ai](https://docsolved.ai) |
 
 ## What to include
 

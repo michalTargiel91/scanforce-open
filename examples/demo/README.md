@@ -20,7 +20,9 @@ documents or a production provider.
    `synthetic-invoice.pdf`.
 3. Within a few minutes the job is **Completed** and shows the fields and two
    line items from `expected-result.json`.
-4. On the job page choose **Preview changes**, then **Apply**. The Opportunity
+4. This step needs a job with a linked record, so it applies only to a file
+   processed from the Record Documents card or the example Flow, not to one
+   uploaded in the Workspace. On the job page choose **Preview changes**, then **Apply**. The Opportunity
    gets Amount 1,230, Close Date 2026-10-30, Next Step `MOCK-INV-0001` and
    Description `Example Supplies Ltd`.
 5. Upload the file again with type `review`. The job stops at **Review
