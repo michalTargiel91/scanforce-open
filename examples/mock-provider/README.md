@@ -64,6 +64,11 @@ Then configure `https://YOUR-HOST/connect` in ScanForce Open and run the
 first. Send **synthetic documents only**, and delete the deployment after your
 evaluation. Do not disable TLS validation anywhere.
 
+The maintainers do not endorse or support a particular hosting platform. If you
+get it running on one, a short recipe in
+[Discussions → Show and tell](https://github.com/michalTargiel91/scanforce-open/discussions/categories/show-and-tell)
+helps the next evaluator.
+
 ## Read it in this order
 
 | Protocol rule | Where in `server.py` | What to notice |
