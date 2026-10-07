@@ -1,0 +1,47 @@
+.sfo-provider {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  border: 1px solid #c9c9c9;
+  border-radius: 0.5rem;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sfo-provider:hover,
+.sfo-provider:focus {
+  border-color: #0b5cab;
+  outline: none;
+}
+
+.sfo-provider_selected {
+  border-color: #0b5cab;
+  box-shadow: inset 0 0 0 2px #0b5cab;
+}
+
+.sfo-mono {
+  font-family: "Salesforce Sans Mono", Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.sfo-inline-form {
+  gap: 0.5rem;
+}
+
+.sfo-warning {
+  color: #8c4b02;
+}
+
+.sfo-error-box {
+  background: #fef1ee;
+  border: 1px solid #ea001e;
+}
+
+.sfo-readiness {
+  justify-content: flex-start;
+  text-align: left;
+}

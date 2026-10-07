@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>File_Name__c</fullName>
+    <description>File title and extension captured from the authorized ContentVersion when the job was created. Display only.</description>
+    <label>File Name</label>
+    <length>255</length>
+    <type>Text</type>
+</CustomField>

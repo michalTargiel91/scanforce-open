@@ -1,0 +1,94 @@
+<template>
+  <template lwc:if={hasRows}>
+    <div class="sfo-table-wrap">
+      <table
+        class="slds-table slds-table_cell-buffer slds-table_bordered slds-table_striped slds-table_fixed-layout"
+        aria-label={ariaLabel}
+      >
+        <thead>
+          <tr class="slds-line-height_reset">
+            <th scope="col" class="sfo-col-document">
+              <div class="slds-truncate">Document</div>
+            </th>
+            <th scope="col" class="sfo-col-status">
+              <div class="slds-truncate">Status</div>
+            </th>
+            <th scope="col" class="sfo-col-type">
+              <div class="slds-truncate">Type</div>
+            </th>
+            <template lwc:if={showSource}>
+              <th scope="col" class="sfo-col-record">
+                <div class="slds-truncate">Record</div>
+              </th>
+            </template>
+            <th scope="col" class="sfo-col-date">
+              <div class="slds-truncate">Submitted</div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <template for:each={decoratedRows} for:item="row">
+            <tr key={row.id} class="slds-hint-parent">
+              <th scope="row" class="sfo-document">
+                <div class="slds-truncate" title={row.fileLabel}>
+                  <a href={row.url} class="sfo-job-link">{row.fileLabel}</a>
+                </div>
+                <div class="slds-text-body_small slds-text-color_weak">
+                  {row.name}
+                </div>
+              </th>
+              <td>
+                <c-sfdc-dcx-status-badge
+                  status={row.status}
+                ></c-sfdc-dcx-status-badge>
+                <template lwc:if={row.errorTitle}>
+                  <div
+                    class="slds-text-body_small slds-text-color_error slds-truncate slds-m-top_xx-small"
+                    title={row.errorDetail}
+                  >
+                    {row.errorTitle}
+                  </div>
+                </template>
+              </td>
+              <td>
+                <div class="slds-truncate">{row.documentType}</div>
+              </td>
+              <template lwc:if={showSource}>
+                <td>
+                  <template lwc:if={row.sourceUrl}>
+                    <div class="slds-truncate" title={row.sourceLabel}>
+                      <a href={row.sourceUrl}>{row.sourceLabel}</a>
+                    </div>
+                    <div class="slds-text-body_small slds-text-color_weak">
+                      {row.sourceObject}
+                    </div>
+                  </template>
+                  <template lwc:else>
+                    <span class="slds-text-color_weak">—</span>
+                  </template>
+                </td>
+              </template>
+              <td class="slds-cell-wrap">
+                <lightning-formatted-date-time
+                  value={row.createdDate}
+                  year="numeric"
+                  month="short"
+                  day="2-digit"
+                  hour="2-digit"
+                  minute="2-digit"
+                ></lightning-formatted-date-time>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </template>
+  <template lwc:else>
+    <div
+      class="slds-p-around_medium slds-text-align_center slds-text-color_weak"
+    >
+      {emptyMessage}
+    </div>
+  </template>
+</template>

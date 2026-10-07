@@ -1,0 +1,457 @@
+<template>
+  <div class="sfo-setup">
+    <lightning-card>
+      <div slot="title" class="slds-media slds-media_center">
+        <div class="slds-media__figure">
+          <lightning-icon
+            icon-name="standard:custom_notification"
+            size="medium"
+            alternative-text=""
+          ></lightning-icon>
+        </div>
+        <div class="slds-media__body">
+          <h1 class="slds-text-heading_medium">ScanForce Open Configuration</h1>
+          <p class="slds-text-body_small slds-text-color_weak">
+            Connect a document processing provider through Salesforce Named and
+            External Credentials.
+          </p>
+        </div>
+      </div>
+      <div slot="actions">
+        <lightning-button-icon
+          icon-name="utility:refresh"
+          alternative-text="Refresh"
+          title="Refresh"
+          onclick={load}
+        ></lightning-button-icon>
+      </div>
+      <div class="slds-p-horizontal_medium">
+        <template lwc:if={loadError}>
+          <div
+            class="slds-notify slds-notify_alert slds-alert_error"
+            role="alert"
+          >
+            <h2>{loadError}</h2>
+          </div>
+        </template>
+        <template lwc:if={status}>
+          <div class={readinessClass} role="status">
+            <lightning-icon
+              icon-name={readinessIcon}
+              size="small"
+              class="slds-m-right_small"
+              alternative-text=""
+            ></lightning-icon>
+            <div>
+              <h2 class="slds-text-heading_small">{readinessTitle}</h2>
+              <p class="slds-text-body_small">{readinessDetail}</p>
+            </div>
+          </div>
+          <template lwc:if={status.readError}>
+            <div
+              class="slds-notify slds-notify_alert slds-alert_warning slds-m-top_small"
+              role="alert"
+            >
+              <h2>
+                Salesforce did not return the full credential configuration
+                ({status.readError}). Administrators need the standard “View
+                Setup and Configuration” and “Customize Application” permissions
+                to manage Named and External Credentials.
+              </h2>
+            </div>
+          </template>
+        </template>
+      </div>
+    </lightning-card>
+
+    <template lwc:if={status}>
+      <!-- Step 1: provider choice -->
+      <lightning-card class="slds-m-top_small">
+        <h2 slot="title" class="slds-text-heading_small">
+          1. Choose a document processing provider
+        </h2>
+        <div class="slds-p-horizontal_medium">
+          <div class="slds-grid slds-wrap slds-gutters_small">
+            <template for:each={providerOptions} for:item="option">
+              <div
+                key={option.value}
+                class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-p-bottom_small"
+              >
+                <button
+                  class={option.className}
+                  data-kind={option.value}
+                  onclick={chooseProvider}
+                  aria-pressed={option.pressed}
+                >
+                  <span class="slds-text-heading_small">{option.title}</span>
+                  <span class="slds-text-body_small slds-text-color_weak"
+                    >{option.subtitle}</span
+                  >
+                  <span class="slds-text-body_regular slds-m-top_x-small"
+                    >{option.description}</span
+                  >
+                  <template lwc:if={option.current}>
+                    <span
+                      class="slds-badge slds-theme_success slds-m-top_x-small"
+                      >Currently configured</span
+                    >
+                  </template>
+                </button>
+              </div>
+            </template>
+          </div>
+          <p
+            class="slds-text-body_small slds-text-color_weak slds-m-bottom_small"
+          >
+            {providerHelp}
+          </p>
+        </div>
+      </lightning-card>
+
+      <!-- Step 2: endpoint -->
+      <lightning-card class="slds-m-top_small">
+        <h2 slot="title" class="slds-text-heading_small">
+          <lightning-icon
+            icon-name={endpointIcon}
+            variant={endpointVariant}
+            size="x-small"
+            class="slds-m-right_x-small"
+            alternative-text=""
+          ></lightning-icon>
+          2. Provider endpoint
+        </h2>
+        <div class="slds-p-horizontal_medium">
+          <template lwc:if={status.endpoint.exists}>
+            <p class="slds-m-bottom_x-small">
+              Named Credential <code>SfdcDcx_Provider</code>:&nbsp;
+              <strong class="sfo-mono">{endpointDisplay}</strong>
+            </p>
+            <ul class="slds-list_dotted slds-m-bottom_small">
+              <template for:each={endpointChecks} for:item="check">
+                <li key={check.key} class={check.className}>{check.label}</li>
+              </template>
+            </ul>
+            <div
+              class="slds-grid slds-wrap slds-grid_vertical-align-end sfo-inline-form"
+            >
+              <div class="slds-col slds-grow">
+                <lightning-input
+                  class="sfo-endpoint-input"
+                  type="url"
+                  label="Base URL (ends with /connect)"
+                  value={endpointInput}
+                  placeholder="https://provider.example.com/connect"
+                  onchange={handleEndpointInput}
+                ></lightning-input>
+              </div>
+              <div class="slds-col slds-no-flex">
+                <lightning-button
+                  variant="brand"
+                  label="Save endpoint"
+                  onclick={saveEndpoint}
+                  disabled={busy}
+                ></lightning-button>
+              </div>
+            </div>
+          </template>
+          <template lwc:else>
+            <p>
+              The <code>SfdcDcx_Provider</code> Named Credential does not exist
+              yet. Deploy the one-time credential bootstrap from the ScanForce
+              Open repository, then refresh this page:
+            </p>
+            <pre
+              class="slds-box slds-box_x-small slds-theme_shade sfo-mono slds-m-vertical_x-small"
+            >
+sf project deploy start --source-dir provider-config --target-org YOUR_ORG</pre
+            >
+            <lightning-button
+              label="Open Named Credentials"
+              icon-name="utility:new_window"
+              onclick={openNamedCredentials}
+            ></lightning-button>
+          </template>
+        </div>
+      </lightning-card>
+
+      <!-- Step 3: API key -->
+      <lightning-card class="slds-m-top_small">
+        <h2 slot="title" class="slds-text-heading_small">
+          <lightning-icon
+            icon-name={credentialIcon}
+            variant={credentialVariant}
+            size="x-small"
+            class="slds-m-right_x-small"
+            alternative-text=""
+          ></lightning-icon>
+          3. Provider API key
+        </h2>
+        <div class="slds-p-horizontal_medium">
+          <p class="slds-m-bottom_x-small">{credentialSummary}</p>
+          <template lwc:if={status.credential.supportsInAppKey}>
+            <div
+              class="slds-grid slds-wrap slds-grid_vertical-align-end sfo-inline-form"
+            >
+              <div class="slds-col slds-grow">
+                <lightning-input
+                  class="sfo-api-key-input"
+                  type="password"
+                  label={apiKeyLabel}
+                  value={apiKeyInput}
+                  autocomplete="off"
+                  onchange={handleApiKeyInput}
+                ></lightning-input>
+              </div>
+              <div class="slds-col slds-no-flex">
+                <lightning-button
+                  variant="brand"
+                  label="Store API key"
+                  onclick={saveApiKey}
+                  disabled={apiKeyDisabled}
+                ></lightning-button>
+              </div>
+            </div>
+            <p
+              class="slds-text-body_small slds-text-color_weak slds-m-top_x-small slds-m-bottom_small"
+            >
+              The key goes straight into the Salesforce External
+              Credential&nbsp;
+              <code>SfdcDcx_ProviderAuth</code> (principal Provider, parameter
+              Token) and is sent as <code>Authorization: Bearer …</code>.
+              ScanForce Open never displays it again or stores it anywhere else.
+              Providers that need another scheme (OAuth client credentials, a
+              custom header, mTLS) are configured in Setup.
+            </p>
+          </template>
+          <template lwc:else>
+            <p class="slds-m-bottom_small">
+              Manage authentication for this External Credential in Setup.
+              ScanForce Open only needs the Named Credential to authenticate its
+              callouts.
+            </p>
+          </template>
+          <lightning-button
+            label="Open External Credentials"
+            icon-name="utility:new_window"
+            onclick={openNamedCredentials}
+            class="slds-m-bottom_small"
+          ></lightning-button>
+        </div>
+      </lightning-card>
+
+      <!-- Step 4: access -->
+      <lightning-card class="slds-m-top_small">
+        <h2 slot="title" class="slds-text-heading_small">
+          <lightning-icon
+            icon-name={accessIcon}
+            variant={accessVariant}
+            size="x-small"
+            class="slds-m-right_x-small"
+            alternative-text=""
+          ></lightning-icon>
+          4. User access to the provider credential
+        </h2>
+        <div class="slds-p-horizontal_medium">
+          <p class="slds-m-bottom_x-small">
+            Background processing runs as the user who submitted a document, so
+            every ScanForce Open user needs access to the Provider principal.
+          </p>
+          <ul class="slds-list_dotted slds-m-bottom_small">
+            <li>Granted by: {accessPermissionSets}</li>
+            <li class={currentUserAccessClass}>{currentUserAccessLabel}</li>
+            <li>{appUsersLabel}</li>
+          </ul>
+          <div class="slds-m-bottom_small">
+            <lightning-button
+              label={grantLabel}
+              icon-name="utility:adduser"
+              onclick={grantAccess}
+              disabled={grantDisabled}
+            ></lightning-button>
+            <lightning-button
+              label="Open Permission Sets"
+              icon-name="utility:new_window"
+              onclick={openPermissionSets}
+              class="slds-m-left_x-small"
+            ></lightning-button>
+          </div>
+        </div>
+      </lightning-card>
+
+      <!-- Step 5: recovery -->
+      <lightning-card class="slds-m-top_small">
+        <h2 slot="title" class="slds-text-heading_small">
+          <lightning-icon
+            icon-name={recoveryIcon}
+            variant={recoveryVariant}
+            size="x-small"
+            class="slds-m-right_x-small"
+            alternative-text=""
+          ></lightning-icon>
+          5. Background recovery
+        </h2>
+        <div class="slds-p-horizontal_medium">
+          <p class="slds-m-bottom_x-small">
+            A five-minute sweep resumes due work if an asynchronous job is lost
+            or a chain reaches its limit. {status.recovery.scheduled} of
+            {status.recovery.expected} schedules are active.
+          </p>
+          <p
+            class="slds-text-body_small slds-text-color_weak slds-m-bottom_small"
+          >
+            The schedules run as the administrator who installs them; that user
+            needs provider access too.
+          </p>
+          <div class="slds-m-bottom_small">
+            <lightning-button
+              label="Install recovery schedule"
+              onclick={installRecovery}
+              disabled={recoveryDisabled}
+            ></lightning-button>
+            <lightning-button
+              label="Open Scheduled Jobs"
+              icon-name="utility:new_window"
+              onclick={openScheduledJobs}
+              class="slds-m-left_x-small"
+            ></lightning-button>
+          </div>
+        </div>
+      </lightning-card>
+
+      <!-- Step 6: test -->
+      <lightning-card class="slds-m-top_small">
+        <h2 slot="title" class="slds-text-heading_small">
+          <lightning-icon
+            icon-name={connectionIcon}
+            variant={connectionVariant}
+            size="x-small"
+            class="slds-m-right_x-small"
+            alternative-text=""
+          ></lightning-icon>
+          6. Test the connection
+        </h2>
+        <div class="slds-p-horizontal_medium slds-p-bottom_small">
+          <p class="slds-m-bottom_x-small">
+            Sends one authenticated request for a job that cannot exist. A
+            compatible provider answers 404 NOT_FOUND; no document is sent and
+            nothing is charged.
+          </p>
+          <lightning-button
+            variant="brand"
+            label="Test connection"
+            icon-name="utility:connected_apps"
+            onclick={testConnection}
+            disabled={busy}
+          ></lightning-button>
+          <template lwc:if={connection}>
+            <div class={connectionClass} role="status">
+              <h3 class="slds-text-heading_small">{connectionTitle}</h3>
+              <p>{connectionDetail}</p>
+              <p
+                class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small"
+              >
+                {connectionMeta}
+              </p>
+            </div>
+          </template>
+        </div>
+      </lightning-card>
+
+      <!-- Field mappings -->
+      <lightning-card
+        title="Field mappings"
+        icon-name="utility:merge"
+        class="slds-m-top_small"
+      >
+        <div slot="actions">
+          <lightning-button
+            label="Manage mappings"
+            icon-name="utility:new_window"
+            onclick={openCustomMetadata}
+          ></lightning-button>
+        </div>
+        <div class="slds-p-horizontal_medium">
+          <p class="slds-m-bottom_small">
+            Optional. ScanForce Open Field Mapping records copy values from
+            Completed results to the linked record when a user applies them (or
+            when a Flow runs the Apply ScanForce Open Field Mappings action).
+            The user's own record and field access always applies.
+          </p>
+          <template lwc:if={hasMappings}>
+            <div class="slds-scrollable_x slds-m-bottom_small">
+              <table
+                class="slds-table slds-table_cell-buffer slds-table_bordered"
+                aria-label="Field mappings"
+              >
+                <thead>
+                  <tr class="slds-line-height_reset">
+                    <th scope="col">Mapping</th>
+                    <th scope="col">Document type</th>
+                    <th scope="col">Result path</th>
+                    <th scope="col">Target field</th>
+                    <th scope="col">State</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template for:each={mappingRows} for:item="mapping">
+                    <tr key={mapping.name}>
+                      <th scope="row">{mapping.name}</th>
+                      <td>{mapping.documentType}</td>
+                      <td class="sfo-mono">{mapping.resultPath}</td>
+                      <td>{mapping.target}</td>
+                      <td class={mapping.stateClass}>{mapping.state}</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+          <template lwc:else>
+            <p class="slds-text-color_weak slds-m-bottom_small">
+              No field mappings yet.
+            </p>
+          </template>
+        </div>
+      </lightning-card>
+
+      <!-- Activity -->
+      <lightning-card
+        title="Processing activity"
+        icon-name="utility:chart"
+        class="slds-m-top_small"
+      >
+        <div slot="actions">
+          <lightning-button
+            label="Open Apex Jobs"
+            icon-name="utility:new_window"
+            onclick={openApexJobs}
+          ></lightning-button>
+        </div>
+        <div class="slds-p-horizontal_medium slds-p-bottom_small">
+          <div class="slds-grid slds-wrap slds-gutters_small">
+            <template for:each={activityTiles} for:item="tile">
+              <div
+                key={tile.key}
+                class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4"
+              >
+                <div class="slds-box slds-box_x-small slds-text-align_center">
+                  <div class="slds-text-heading_medium">{tile.count}</div>
+                  <div class="slds-text-body_small slds-text-color_weak">
+                    {tile.label}
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <template lwc:if={status.activity.overdue}>
+            <p class="slds-text-color_error slds-m-top_small">
+              {status.activity.overdue} job(s) are more than 15 minutes overdue.
+              Check that background recovery is installed and that Apex Jobs are
+              running.
+            </p>
+          </template>
+        </div>
+      </lightning-card>
+    </template>
+  </div>
+</template>

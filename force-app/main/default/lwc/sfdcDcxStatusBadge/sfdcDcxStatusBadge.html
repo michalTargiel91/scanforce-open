@@ -1,0 +1,13 @@
+<template>
+  <span class={info.badgeClass} title={info.summary}>
+    <span class="slds-badge__icon slds-badge__icon_left">
+      <lightning-icon
+        icon-name={info.icon}
+        size="xx-small"
+        variant={iconVariant}
+        alternative-text=""
+      ></lightning-icon>
+    </span>
+    {info.label}
+  </span>
+</template>

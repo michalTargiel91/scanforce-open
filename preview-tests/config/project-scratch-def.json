@@ -1,0 +1,10 @@
+{
+  "orgName": "ScanForce Open preview validation",
+  "edition": "Developer",
+  "release": "Preview",
+  "settings": {
+    "lightningExperienceSettings": {
+      "enableS1DesktopEnabled": true
+    }
+  }
+}

@@ -1,0 +1,195 @@
+import { LightningElement, api } from "lwc";
+import { ShowToastEvent } from "lightning/platformShowToastEvent";
+import getContext from "@salesforce/apex/SfdcDcx_WorkspaceController.getContext";
+import listJobs from "@salesforce/apex/SfdcDcx_WorkspaceController.listJobs";
+import listRecordFiles from "@salesforce/apex/SfdcDcx_WorkspaceController.listRecordFiles";
+import resolveLatestVersions from "@salesforce/apex/SfdcDcx_WorkspaceController.resolveLatestVersions";
+import submitFiles from "@salesforce/apex/SfdcDcx_WorkspaceController.submitFiles";
+import {
+  errorInfo,
+  formatBytes,
+  hasActive,
+  isActive,
+  reduceError,
+  submitInBatches,
+} from "c/sfdcDcxJobState";
+
+const POLL_INTERVAL_MS = 8000;
+const POLL_IDLE_LIMIT_MS = 20 * 60 * 1000;
+const UNSUPPORTED_LABELS = {
+  UNSUPPORTED_FILE_TYPE: "Type not supported",
+  FILE_TOO_LARGE: "Over 5 MB",
+};
+
+export default class SfdcDcxRecordDocuments extends LightningElement {
+  @api recordId;
+  @api cardTitle = "Document processing";
+  @api documentType = "auto";
+  context;
+  loadError;
+  files = [];
+  jobs = [];
+  submitting = false;
+  pollTimer;
+  lastChangeAt = Date.now();
+  lastSignature = "";
+
+  connectedCallback() {
+    this.load();
+  }
+
+  disconnectedCallback() {
+    clearTimeout(this.pollTimer);
+  }
+
+  async load() {
+    try {
+      this.context = await getContext();
+      if (this.context.canSubmit) {
+        await this.loadRecordData();
+      }
+      this.loadError = undefined;
+    } catch (error) {
+      this.loadError = reduceError(error);
+    }
+  }
+
+  async loadRecordData() {
+    const [files, jobs] = await Promise.all([
+      listRecordFiles({ recordId: this.recordId }),
+      listJobs({ filter: "all", sourceRecordId: this.recordId, limitSize: 20 }),
+    ]);
+    const signature = jobs.map((row) => `${row.id}:${row.status}`).join("|");
+    if (signature !== this.lastSignature) {
+      this.lastSignature = signature;
+      this.lastChangeAt = Date.now();
+    }
+    this.files = files;
+    this.jobs = jobs;
+    this.schedule();
+  }
+
+  schedule() {
+    clearTimeout(this.pollTimer);
+    if (
+      hasActive(this.jobs) &&
+      Date.now() - this.lastChangeAt < POLL_IDLE_LIMIT_MS
+    ) {
+      // eslint-disable-next-line @lwc/lwc/no-async-operation
+      this.pollTimer = setTimeout(() => {
+        if (document.visibilityState === "hidden") {
+          this.schedule();
+        } else {
+          this.loadRecordData().catch((error) => {
+            this.loadError = reduceError(error);
+          });
+        }
+      }, POLL_INTERVAL_MS);
+    }
+  }
+
+  get ready() {
+    return Boolean(this.context && this.context.canSubmit);
+  }
+
+  get noAccess() {
+    return Boolean(this.context && !this.context.canSubmit);
+  }
+
+  get acceptedFormats() {
+    return (this.context && this.context.acceptedFormats) || [];
+  }
+
+  get hasFiles() {
+    return this.files.length > 0;
+  }
+
+  get fileRows() {
+    return this.files.map((file) => {
+      const busy = file.latestJobStatus && isActive(file.latestJobStatus);
+      const done =
+        file.latestJobStatus === "Completed" ||
+        file.latestJobStatus === "Review Required";
+      return {
+        ...file,
+        label: file.extension ? `${file.title}.${file.extension}` : file.title,
+        sizeLabel: formatBytes(file.size),
+        jobUrl: file.latestJobId
+          ? `/lightning/r/${file.latestJobId}/view`
+          : null,
+        canProcess: file.supported && !busy && !done,
+        processLabel: file.latestJobId ? "Try again" : "Process",
+        unsupportedLabel: UNSUPPORTED_LABELS[file.unsupportedReason],
+      };
+    });
+  }
+
+  handleRefresh() {
+    this.lastChangeAt = Date.now();
+    this.load();
+  }
+
+  async processFile(event) {
+    await this.submit([event.target.dataset.id]);
+  }
+
+  async handleUploadFinished(event) {
+    const uploaded = event.detail.files || [];
+    let versionIds = uploaded.map((file) => file.contentVersionId);
+    try {
+      if (versionIds.some((id) => !id)) {
+        versionIds = await resolveLatestVersions({
+          contentDocumentIds: uploaded.map((file) => file.documentId),
+        });
+      }
+      await this.submit(versionIds.filter((id) => Boolean(id)));
+    } catch (error) {
+      this.toast(
+        "Could not submit uploaded files",
+        reduceError(error),
+        "error",
+      );
+    }
+  }
+
+  async submit(versionIds) {
+    if (!versionIds.length) {
+      return;
+    }
+    this.submitting = true;
+    try {
+      const results = await submitInBatches(submitFiles, versionIds, 25, {
+        sourceRecordId: this.recordId,
+        documentType: this.documentType || "auto",
+        reprocess: false,
+      });
+      const rejected = results.filter((result) => !result.success);
+      if (rejected.length) {
+        const info = errorInfo(rejected[0].errorCode);
+        this.toast(
+          `${rejected.length} file(s) not submitted`,
+          info ? `${info.title}. ${info.detail}` : rejected[0].errorCode,
+          "warning",
+        );
+      }
+      const accepted = results.length - rejected.length;
+      if (accepted) {
+        this.toast(
+          "Processing started",
+          `${accepted} document(s) submitted.`,
+          "success",
+        );
+      }
+      this.lastChangeAt = Date.now();
+      await this.loadRecordData();
+    } catch (error) {
+      this.toast("Submission failed", reduceError(error), "error");
+    } finally {
+      this.submitting = false;
+    }
+  }
+
+  toast(title, message, variant) {
+    this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
+  }
+}

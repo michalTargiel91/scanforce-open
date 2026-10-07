@@ -1,0 +1,41 @@
+name: Salesforce scratch validation
+# Maintainer-only release gate. Runs only on manual dispatch in the protected
+# "salesforce-validation" environment; pull requests never receive Dev Hub credentials.
+on:
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "api67 (release gate) or preview"
+        required: true
+        default: api67
+        type: choice
+        options: [api67, preview]
+permissions:
+  contents: read
+
+jobs:
+  scratch:
+    runs-on: ubuntu-latest
+    environment: salesforce-validation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --global @salesforce/cli@2.151.7
+      - name: Authenticate the dedicated validation Dev Hub
+        env:
+          SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
+        run: |
+          test -n "$SFDX_AUTH_URL"
+          printf '%s' "$SFDX_AUTH_URL" | sf org login sfdx-url --sfdx-url-stdin --alias validation-hub
+      - name: Deploy and run Apex tests in a new scratch org
+        env:
+          DEV_HUB_ALIAS: validation-hub
+          LANE: ${{ inputs.lane }}
+        run: |
+          if [ "$LANE" = "preview" ]; then
+            bash scripts/validate-preview.sh
+          else
+            bash scripts/validate-scratch.sh
+          fi

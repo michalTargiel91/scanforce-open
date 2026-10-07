@@ -1,0 +1,23 @@
+.sfo-col-document {
+  width: 30%;
+}
+
+.sfo-col-status {
+  width: 21%;
+}
+
+.sfo-col-type {
+  width: 10%;
+}
+
+.sfo-col-record {
+  width: 18%;
+}
+
+.sfo-col-date {
+  width: 21%;
+}
+
+.sfo-table-wrap {
+  overflow: hidden;
+}

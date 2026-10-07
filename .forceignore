@@ -1,0 +1,11 @@
+# Only metadata is deployed. Tooling, docs, tests and the Python mock never are.
+.git/**
+.github/**
+node_modules/**
+docs/**
+scripts/**
+tools/**
+examples/mock-provider/**
+**/__tests__/**
+**/jsconfig.json
+**/*.md

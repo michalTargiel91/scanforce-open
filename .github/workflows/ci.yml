@@ -1,0 +1,81 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-and-unit:
+    name: Lint, format, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - name: ESLint (LWC), Apex grammar, complexity and metadata guardrails
+        run: npm run lint
+      - name: Prettier (Apex, LWC JS/HTML/CSS)
+        run: npm run format:check
+      - name: Jest (Lightning Web Components) with coverage thresholds
+        run: npm run test:unit:coverage
+      - name: Python suites (mock provider, conformance checker, scripts)
+        run: npm run test:python
+      - name: Shell syntax
+        run: |
+          bash -n scripts/install.sh
+          bash -n scripts/validate-scratch.sh
+          bash -n scripts/validate-preview.sh
+
+  salesforce-static:
+    name: Salesforce source conversion and security rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Salesforce CLI and Code Analyzer
+        run: |
+          npm install --global @salesforce/cli@2.151.7
+          sf plugins install @salesforce/plugin-code-analyzer@5.7.1
+      - name: Convert source (metadata structure)
+        run: |
+          sf project convert source --root-dir force-app --output-dir "$RUNNER_TEMP/scanforce-open-metadata"
+          sf project convert source --root-dir provider-config --output-dir "$RUNNER_TEMP/provider-config-metadata"
+      - name: PMD security rules (no org required)
+        run: sf code-analyzer run --workspace . --target force-app --rule-selector pmd:Security --severity-threshold 3
+
+  security:
+    name: Secret scan and dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan working tree and Git history for secrets
+        run: docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo --redact --no-banner
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Production dependency audit (gate)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Development toolchain audit (report only)
+        run: npm audit --audit-level=high || echo "::warning::Development-only dependency advisories found; nothing from npm is deployed to Salesforce."

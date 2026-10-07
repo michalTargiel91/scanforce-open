@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata"><fullName>Correlation_Id__c</fullName><description>Non-PII trace identifier generated once at local job creation.</description><label>Correlation ID</label><length>64</length><type>Text</type><externalId>true</externalId><unique>true</unique><caseSensitive>true</caseSensitive></CustomField>

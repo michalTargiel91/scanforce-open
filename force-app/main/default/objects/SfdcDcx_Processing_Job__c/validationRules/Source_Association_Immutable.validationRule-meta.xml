@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata"><fullName>Source_Association_Immutable</fullName><active>true</active><description>Authorization is frozen when the connector job is created.</description><errorConditionFormula>AND(NOT(ISNEW()), OR(ISCHANGED(Source_File_Id__c), ISCHANGED(Source_Record_Id__c)))</errorConditionFormula><errorMessage>The authorized source association is immutable.</errorMessage></ValidationRule>

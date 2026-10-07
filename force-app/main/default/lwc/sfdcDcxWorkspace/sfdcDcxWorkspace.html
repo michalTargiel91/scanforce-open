@@ -1,0 +1,329 @@
+<template>
+  <div class="sfo-workspace">
+    <lightning-card>
+      <div slot="title" class="slds-media slds-media_center">
+        <div class="slds-media__figure">
+          <lightning-icon
+            icon-name="standard:document"
+            size="medium"
+            alternative-text=""
+          ></lightning-icon>
+        </div>
+        <div class="slds-media__body">
+          <h1 class="slds-text-heading_medium">ScanForce Open</h1>
+          <p class="slds-text-body_small slds-text-color_weak">
+            Upload Salesforce Files, let your document provider extract
+            structured data, and review the results here.
+          </p>
+        </div>
+      </div>
+      <div slot="actions">
+        <lightning-button-group>
+          <lightning-button-icon
+            icon-name="utility:refresh"
+            alternative-text="Refresh"
+            title="Refresh"
+            onclick={handleRefresh}
+          ></lightning-button-icon>
+          <template lwc:if={isAdmin}>
+            <lightning-button
+              label="Configuration"
+              icon-name="utility:settings"
+              onclick={openConfiguration}
+            ></lightning-button>
+          </template>
+        </lightning-button-group>
+      </div>
+
+      <template lwc:if={loadError}>
+        <div class="slds-p-horizontal_medium">
+          <div
+            class="slds-notify slds-notify_alert slds-alert_error"
+            role="alert"
+          >
+            <h2>{loadError}</h2>
+          </div>
+        </div>
+      </template>
+
+      <template lwc:if={showSetupBanner}>
+        <div class="slds-p-horizontal_medium slds-p-bottom_small">
+          <div
+            class="slds-notify slds-notify_alert slds-alert_warning"
+            role="alert"
+          >
+            <lightning-icon
+              icon-name="utility:warning"
+              size="x-small"
+              class="slds-m-right_x-small"
+              alternative-text="Warning"
+            ></lightning-icon>
+            <h2>
+              Provider setup is not finished. Open Configuration to connect
+              DocSolved.ai or your own provider before users submit documents.
+            </h2>
+          </div>
+        </div>
+      </template>
+
+      <template lwc:if={noAccess}>
+        <div class="slds-p-around_medium">
+          <div class="slds-scoped-notification slds-theme_light" role="status">
+            <p>
+              You need the <strong>ScanForce Open User</strong> permission set
+              to process documents. Ask your Salesforce administrator.
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <template lwc:if={ready}>
+        <div class="slds-p-horizontal_medium">
+          <div class="slds-grid slds-wrap slds-gutters_small sfo-tiles">
+            <template for:each={tiles} for:item="tile">
+              <div
+                key={tile.value}
+                class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-p-bottom_small"
+              >
+                <button
+                  class={tile.className}
+                  data-filter={tile.value}
+                  onclick={handleTile}
+                  aria-pressed={tile.pressed}
+                >
+                  <span class="sfo-tile__count">{tile.count}</span>
+                  <span class="sfo-tile__label">{tile.label}</span>
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </lightning-card>
+
+    <template lwc:if={ready}>
+      <div class="slds-grid slds-wrap slds-gutters_small slds-m-top_small">
+        <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-3">
+          <lightning-card title="Add documents" icon-name="utility:upload">
+            <div class="slds-p-horizontal_medium">
+              <lightning-combobox
+                name="documentType"
+                label="Document type"
+                value={documentTypeChoice}
+                options={documentTypeOptions}
+                onchange={handleDocumentTypeChoice}
+                field-level-help="Sent to the provider as a hint. Automatic lets the provider classify the document."
+              ></lightning-combobox>
+              <template lwc:if={customTypeSelected}>
+                <lightning-input
+                  class="slds-m-top_x-small sfo-custom-type"
+                  label="Custom document type"
+                  value={customDocumentType}
+                  pattern="[A-Za-z][A-Za-z0-9_\-]{0,99}"
+                  message-when-pattern-mismatch="Use letters, digits, - or _, starting with a letter."
+                  onchange={handleCustomType}
+                  required
+                ></lightning-input>
+              </template>
+              <lightning-input
+                class="slds-m-top_small"
+                type="toggle"
+                label="Process automatically after upload"
+                checked={autoProcess}
+                message-toggle-active="On"
+                message-toggle-inactive="Off"
+                onchange={handleAutoProcess}
+              ></lightning-input>
+              <div class="slds-m-top_small">
+                <lightning-file-upload
+                  label="Upload files"
+                  name="scanforceOpenUpload"
+                  accept={acceptedFormats}
+                  onuploadfinished={handleUploadFinished}
+                  multiple
+                ></lightning-file-upload>
+              </div>
+              <p
+                class="slds-text-body_small slds-text-color_weak slds-m-top_x-small"
+              >
+                PDF, PNG or JPEG · up to {maxFileLabel} each · up to {maxFiles}
+                files at once. Uploaded files stay private to you unless you
+                share them.
+              </p>
+              <div class="slds-m-top_medium slds-m-bottom_small">
+                <lightning-button
+                  label={pickerButtonLabel}
+                  icon-name="utility:file"
+                  onclick={togglePicker}
+                  stretch
+                ></lightning-button>
+              </div>
+
+              <template lwc:if={pickerOpen}>
+                <div
+                  class="slds-box slds-box_x-small slds-m-bottom_small sfo-picker"
+                >
+                  <lightning-input
+                    type="search"
+                    label="Search your files"
+                    value={fileSearch}
+                    onchange={handleFileSearch}
+                    variant="label-hidden"
+                    placeholder="Search your files"
+                  ></lightning-input>
+                  <template lwc:if={filesLoading}>
+                    <div class="slds-is-relative sfo-spinner-box">
+                      <lightning-spinner
+                        alternative-text="Loading files"
+                        size="small"
+                      ></lightning-spinner>
+                    </div>
+                  </template>
+                  <template lwc:elseif={hasFiles}>
+                    <div class="sfo-file-table slds-m-top_x-small">
+                      <lightning-datatable
+                        key-field="contentVersionId"
+                        data={fileRows}
+                        columns={fileColumns}
+                        max-row-selection={maxFiles}
+                        onrowselection={handleFileSelection}
+                        resize-column-disabled
+                      ></lightning-datatable>
+                    </div>
+                    <template lwc:if={hiddenFileCount}>
+                      <p
+                        class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small"
+                      >
+                        {hiddenFileCount} file(s) over the size limit are not
+                        shown.
+                      </p>
+                    </template>
+                    <div class="slds-m-top_x-small">
+                      <lightning-button
+                        variant="brand"
+                        label={processSelectedLabel}
+                        onclick={processSelected}
+                        disabled={processSelectedDisabled}
+                        stretch
+                      ></lightning-button>
+                    </div>
+                  </template>
+                  <template lwc:else>
+                    <p class="slds-p-around_small slds-text-color_weak">
+                      No PDF, PNG or JPEG files found.
+                    </p>
+                  </template>
+                </div>
+              </template>
+
+              <template lwc:if={submitting}>
+                <div class="slds-is-relative sfo-spinner-box">
+                  <lightning-spinner
+                    alternative-text="Submitting"
+                    size="small"
+                  ></lightning-spinner>
+                </div>
+              </template>
+
+              <template lwc:if={hasOutcomes}>
+                <div class="slds-m-bottom_small" aria-live="polite">
+                  <p class="slds-text-title_caps slds-m-bottom_xx-small">
+                    Last submission
+                  </p>
+                  <ul class="slds-has-dividers_bottom-space">
+                    <template for:each={outcomes} for:item="outcome">
+                      <li key={outcome.key} class="slds-item">
+                        <template lwc:if={outcome.success}>
+                          <lightning-icon
+                            icon-name="utility:success"
+                            variant="success"
+                            size="xx-small"
+                            class="slds-m-right_x-small"
+                            alternative-text="Submitted"
+                          ></lightning-icon>
+                          <a href={outcome.url}>{outcome.label}</a>
+                          <span class="slds-text-color_weak"> · submitted</span>
+                        </template>
+                        <template lwc:else>
+                          <lightning-icon
+                            icon-name="utility:error"
+                            variant="error"
+                            size="xx-small"
+                            class="slds-m-right_x-small"
+                            alternative-text="Rejected"
+                          ></lightning-icon>
+                          <span>{outcome.label}</span>
+                          <div
+                            class="slds-text-body_small slds-text-color_error"
+                          >
+                            {outcome.message}
+                          </div>
+                        </template>
+                      </li>
+                    </template>
+                  </ul>
+                </div>
+              </template>
+            </div>
+          </lightning-card>
+        </div>
+
+        <div class="slds-col slds-size_1-of-1 slds-large-size_2-of-3">
+          <lightning-card title="Processing jobs" icon-name="utility:list">
+            <div
+              slot="actions"
+              class="slds-text-body_small slds-text-color_weak"
+            >
+              <template lwc:if={polling}>
+                <lightning-icon
+                  icon-name="utility:sync"
+                  size="xx-small"
+                  class="slds-m-right_xx-small"
+                  alternative-text=""
+                ></lightning-icon>
+                Updating automatically
+              </template>
+              <template lwc:elseif={lastLoaded}>
+                Updated&nbsp;
+                <lightning-formatted-date-time
+                  value={lastLoaded}
+                  hour="2-digit"
+                  minute="2-digit"
+                  second="2-digit"
+                ></lightning-formatted-date-time>
+              </template>
+            </div>
+            <div class="slds-p-horizontal_medium slds-p-bottom_small">
+              <lightning-radio-group
+                name="jobFilter"
+                label="Show"
+                variant="label-hidden"
+                options={filterOptions}
+                value={filter}
+                type="button"
+                onchange={handleFilter}
+              ></lightning-radio-group>
+            </div>
+            <template lwc:if={jobsLoading}>
+              <div class="slds-is-relative sfo-spinner-box">
+                <lightning-spinner
+                  alternative-text="Loading jobs"
+                  size="small"
+                ></lightning-spinner>
+              </div>
+            </template>
+            <c-sfdc-dcx-job-list
+              rows={jobs}
+              show-source
+              empty-message={emptyMessage}
+            ></c-sfdc-dcx-job-list>
+            <p slot="footer" class="slds-text-body_small slds-text-color_weak">
+              Processing continues in the background. You can leave this page
+              and come back at any time.
+            </p>
+          </lightning-card>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>

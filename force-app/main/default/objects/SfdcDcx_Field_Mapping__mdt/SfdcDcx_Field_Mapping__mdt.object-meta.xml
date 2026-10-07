@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>ScanForce Open: maps a path in a Completed job's structured result to a field on the job's source record. Applied on user request or by the Apply Field Mappings action, always with the running user's access.</description>
+    <label>ScanForce Open Field Mapping</label>
+    <pluralLabel>ScanForce Open Field Mappings</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>

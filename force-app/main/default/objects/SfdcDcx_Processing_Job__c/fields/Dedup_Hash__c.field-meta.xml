@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata"><fullName>Dedup_Hash__c</fullName><description>Non-secret SHA-256 of org, file version and type. Used as the provider idempotency identity.</description><label>Submission Hash</label><length>64</length><type>Text</type><externalId>true</externalId><unique>true</unique><caseSensitive>true</caseSensitive></CustomField>

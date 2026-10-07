@@ -1,0 +1,13 @@
+ScanForce Open
+Copyright 2026 SYNAIRO sp. z o.o.
+
+ScanForce Open is maintained by DocSolved.ai.
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The deployable Salesforce source (force-app/) contains no bundled third-party
+code. User interfaces use Salesforce Lightning base components and Salesforce
+Lightning Design System classes provided by the Salesforce platform at runtime.
+Development tooling (for example Salesforce CLI, Prettier, ESLint, Jest and the
+packages listed in package.json) is installed from public registries under its
+own licenses and is not redistributed in this repository.

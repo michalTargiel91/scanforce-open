@@ -1,0 +1,120 @@
+<template>
+  <lightning-card title="Update the linked record" icon-name="utility:merge">
+    <div slot="actions">
+      <lightning-button
+        label={previewLabel}
+        icon-name="utility:preview"
+        onclick={loadPreview}
+        disabled={busy}
+      ></lightning-button>
+    </div>
+    <div class="slds-p-horizontal_medium">
+      <template lwc:if={appliedAt}>
+        <p
+          class="slds-text-body_small slds-text-color_weak slds-m-bottom_x-small"
+        >
+          Last applied&nbsp;
+          <lightning-formatted-date-time
+            value={appliedAt}
+            year="numeric"
+            month="short"
+            day="2-digit"
+            hour="2-digit"
+            minute="2-digit"
+          ></lightning-formatted-date-time>
+        </p>
+      </template>
+      <template lwc:if={busy}>
+        <div class="slds-is-relative sfo-spinner-box">
+          <lightning-spinner
+            alternative-text="Working"
+            size="small"
+          ></lightning-spinner>
+        </div>
+      </template>
+      <template lwc:if={reason}>
+        <p class="slds-text-color_weak">{reason}</p>
+      </template>
+      <template lwc:if={hasChanges}>
+        <p class="slds-m-bottom_x-small">
+          Field mappings defined by your administrator copy extracted values to
+          the linked record <strong>{targetLabel}</strong>. Your own access to
+          the record and its fields applies.
+        </p>
+        <div class="slds-scrollable_x">
+          <table
+            class="slds-table slds-table_cell-buffer slds-table_bordered"
+            aria-label="Proposed record changes"
+          >
+            <thead>
+              <tr class="slds-line-height_reset">
+                <th scope="col" class="sfo-check">
+                  <span class="slds-assistive-text">Apply</span>
+                </th>
+                <th scope="col">Field</th>
+                <th scope="col">Current value</th>
+                <th scope="col">Extracted value</th>
+                <th scope="col">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template for:each={rows} for:item="row">
+                <tr key={row.key}>
+                  <td class="sfo-check">
+                    <template lwc:if={row.ready}>
+                      <lightning-input
+                        class="sfo-apply-check"
+                        type="checkbox"
+                        label={row.checkLabel}
+                        variant="label-hidden"
+                        checked={row.selected}
+                        data-field={row.fieldName}
+                        onchange={toggleField}
+                      ></lightning-input>
+                    </template>
+                  </td>
+                  <th scope="row">
+                    <div class="slds-truncate" title={row.fieldName}>
+                      {row.fieldLabel}
+                    </div>
+                    <div
+                      class="slds-text-body_small slds-text-color_weak slds-truncate"
+                    >
+                      {row.resultPath}
+                    </div>
+                  </th>
+                  <td>
+                    <div class="slds-truncate" title={row.currentValue}>
+                      {row.currentDisplay}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="slds-truncate" title={row.newValue}>
+                      {row.newDisplay}
+                    </div>
+                  </td>
+                  <td>
+                    <span class={row.statusClass}>{row.statusLabel}</span>
+                    <template lwc:if={row.message}>
+                      <div class="slds-text-body_small slds-text-color_weak">
+                        {row.message}
+                      </div>
+                    </template>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="slds-m-top_small slds-m-bottom_small">
+          <lightning-button
+            variant="brand"
+            label={applyLabel}
+            onclick={apply}
+            disabled={applyDisabled}
+          ></lightning-button>
+        </div>
+      </template>
+    </div>
+  </lightning-card>
+</template>

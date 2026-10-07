@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Applied_At__c</fullName>
+    <description>When extracted values were last applied to the source record through ScanForce Open field mappings.</description>
+    <label>Applied to Record At</label>
+    <type>DateTime</type>
+</CustomField>

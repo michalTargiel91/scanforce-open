@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>ScanForce Open: lets users (and the recovery schedule owner) make authenticated callouts through the SfdcDcx_ProviderAuth Provider principal. Assign together with ScanForce Open User or Administrator.</description>
+    <externalCredentialPrincipalAccesses>
+        <enabled>true</enabled>
+        <externalCredentialPrincipal>SfdcDcx_ProviderAuth-Provider</externalCredentialPrincipal>
+    </externalCredentialPrincipalAccesses>
+    <label>ScanForce Open Provider Access</label>
+</PermissionSet>

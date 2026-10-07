@@ -1,0 +1,30 @@
+# Dependencies and tool caches
+node_modules/
+coverage/
+.eslintcache
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Salesforce CLI state and local org metadata (contains org identities)
+.sf/
+.sfdx/
+.localdevserver/
+provider-config-install/
+
+# Validation evidence can contain org IDs and usernames; keep it local
+test-results/
+
+# Local data and secrets
+.env
+.env.*
+*.sqlite3*
+*.pem
+*.key
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+.playwright-mcp/
+deployment-settings-install/

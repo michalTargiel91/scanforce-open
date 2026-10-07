@@ -1,0 +1,87 @@
+<template>
+  <template lwc:if={hasWarnings}>
+    <div class="slds-box slds-box_x-small slds-theme_shade slds-m-bottom_small">
+      <p class="slds-text-title_caps slds-m-bottom_xx-small">
+        Provider warnings
+      </p>
+      <ul class="slds-list_dotted">
+        <template for:each={warnings} for:item="warning">
+          <li key={warning.key}>{warning.text}</li>
+        </template>
+      </ul>
+    </div>
+  </template>
+  <template lwc:if={hasFields}>
+    <dl class="sfo-fields">
+      <template for:each={fields} for:item="field">
+        <div key={field.path} class="sfo-field">
+          <dt class="slds-text-title slds-truncate" title={field.path}>
+            {field.label}
+          </dt>
+          <dd class="slds-text-body_regular sfo-value">
+            <template lwc:if={field.isNumber}>
+              <lightning-formatted-number
+                value={field.number}
+                maximum-fraction-digits="6"
+              ></lightning-formatted-number>
+            </template>
+            <template lwc:elseif={field.isEmpty}>
+              <span class="slds-text-color_weak">—</span>
+            </template>
+            <template lwc:else>{field.display}</template>
+          </dd>
+        </div>
+      </template>
+    </dl>
+  </template>
+  <template for:each={tables} for:item="table">
+    <div key={table.path} class="slds-m-top_medium">
+      <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+        {table.label}
+        <span class="slds-text-color_weak slds-text-body_small">
+          ({table.totalRows})</span
+        >
+      </h3>
+      <div class="slds-scrollable_x">
+        <table
+          class="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered"
+          aria-label={table.label}
+        >
+          <thead>
+            <tr class="slds-line-height_reset">
+              <template for:each={table.headers} for:item="header">
+                <th key={header.key} scope="col">
+                  <div class="slds-truncate" title={header.label}>
+                    {header.label}
+                  </div>
+                </th>
+              </template>
+            </tr>
+          </thead>
+          <tbody>
+            <template for:each={table.body} for:item="row">
+              <tr key={row.key}>
+                <template for:each={row.cells} for:item="cell">
+                  <td key={cell.key}>
+                    <div class="slds-truncate" title={cell.value}>
+                      {cell.value}
+                    </div>
+                  </td>
+                </template>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+  <template lwc:if={truncated}>
+    <p class="slds-text-body_small slds-text-color_weak slds-m-top_small">
+      Large results are shortened in this view. The complete compact result
+      stays on the job record.
+    </p>
+  </template>
+  <template lwc:if={isEmpty}>
+    <p class="slds-text-color_weak">The provider returned no fields.</p>
+  </template>
+</template>

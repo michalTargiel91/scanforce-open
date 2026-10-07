@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata"><fullName>Submission_Key__c</fullName><description>Current ordinary-submit identity. Cleared after terminal failure so a safe new attempt can be created.</description><label>Ordinary Submission Key</label><length>64</length><type>Text</type><externalId>true</externalId><unique>true</unique><caseSensitive>true</caseSensitive></CustomField>

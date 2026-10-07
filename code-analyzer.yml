@@ -1,0 +1,12 @@
+# This is a non-secret digest of org/file/type, not an authentication credential.
+# Scope the exception to one rule, one field and one finding; keep every other
+# Security rule and field active. Its provenance is pinned in the Apex tests.
+suppressions:
+  force-app/main/default/objects/SfdcDcx_Processing_Job__c/fields/Dedup_Hash__c.field-meta.xml:
+    - rule_selector: pmd:ProtectSensitiveData
+      max_suppressed_violations: 1
+      reason: Public idempotency digest; authentication is exclusively Salesforce External Credentials.
+  force-app/main/default/objects/SfdcDcx_Processing_Job__c/fields/Submission_Key__c.field-meta.xml:
+    - rule_selector: pmd:ProtectSensitiveData
+      max_suppressed_violations: 1
+      reason: Public ordinary-submit digest; authentication is exclusively Salesforce External Credentials.

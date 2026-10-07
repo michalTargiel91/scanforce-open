@@ -1,0 +1,46 @@
+{
+  "name": "scanforce-open",
+  "version": "1.0.0-rc.1",
+  "description": "Open-source document intelligence workspace for Salesforce. Use DocSolved.ai or bring your own compatible backend.",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "lint": "npm run lint:lwc && npm run lint:apex && npm run lint:metadata",
+    "lint:lwc": "eslint force-app/main/default/lwc",
+    "lint:apex": "node scripts/check-apex.mjs && python3 scripts/check-complexity.py",
+    "lint:metadata": "python3 scripts/check-metadata.py",
+    "test": "npm run test:unit && npm run test:python",
+    "test:unit": "sfdx-lwc-jest",
+    "test:unit:coverage": "sfdx-lwc-jest --coverage -- --no-cache",
+    "test:python": "python3 -m unittest discover -s examples/mock-provider -v && python3 -m unittest discover -s tools/provider-conformance -v && python3 -m unittest discover -s scripts/tests -v",
+    "format": "prettier --write \"force-app/**/*.{cls,js,html,css}\"",
+    "format:check": "prettier --check \"force-app/**/*.{cls,js,html,css}\""
+  },
+  "devDependencies": {
+    "@apexdevtools/apex-parser": "5.2.0",
+    "@babel/core": "^7.28.0",
+    "@babel/eslint-parser": "^7.28.0",
+    "@lwc/eslint-plugin-lwc": "^3.5.0",
+    "@salesforce/eslint-config-lwc": "^4.1.2",
+    "@salesforce/eslint-plugin-lightning": "^2.0.0",
+    "@salesforce/sfdx-lwc-jest": "^7.9.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jest": "^29.0.0",
+    "prettier": "3.6.2",
+    "prettier-plugin-apex": "2.3.0"
+  },
+  "prettier": {
+    "plugins": [
+      "prettier-plugin-apex"
+    ],
+    "overrides": [
+      {
+        "files": "**/lwc/**/*.html",
+        "options": {
+          "parser": "lwc"
+        }
+      }
+    ]
+  }
+}

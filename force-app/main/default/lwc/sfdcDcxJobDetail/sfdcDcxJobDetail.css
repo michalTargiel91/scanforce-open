@@ -1,0 +1,13 @@
+.sfo-spinner-box {
+  min-height: 6rem;
+}
+
+.sfo-actions {
+  gap: 0.25rem;
+}
+
+.sfo-error-box {
+  background: #fef1ee;
+  color: #3e3e3c;
+  border: 1px solid #ea001e;
+}

@@ -1,0 +1,106 @@
+<template>
+  <div class="sfo-record-documents">
+    <lightning-card title={cardTitle} icon-name="standard:document">
+      <div slot="actions">
+        <lightning-button-icon
+          icon-name="utility:refresh"
+          alternative-text="Refresh"
+          title="Refresh"
+          onclick={handleRefresh}
+        ></lightning-button-icon>
+      </div>
+      <template lwc:if={loadError}>
+        <p class="slds-p-horizontal_medium slds-text-color_error">
+          {loadError}
+        </p>
+      </template>
+      <template lwc:if={noAccess}>
+        <p class="slds-p-horizontal_medium slds-text-color_weak">
+          The ScanForce Open User permission set is required to process
+          documents.
+        </p>
+      </template>
+      <template lwc:if={ready}>
+        <div class="slds-p-horizontal_medium">
+          <lightning-file-upload
+            label="Attach and process"
+            name="scanforceOpenRecordUpload"
+            accept={acceptedFormats}
+            record-id={recordId}
+            onuploadfinished={handleUploadFinished}
+            multiple
+          ></lightning-file-upload>
+          <p
+            class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small"
+          >
+            PDF, PNG or JPEG up to 5 MB. Uploaded files are attached to this
+            record and processed with type “{documentType}”.
+          </p>
+
+          <h3
+            class="slds-text-title_caps slds-m-top_medium slds-m-bottom_x-small"
+          >
+            Attached files
+          </h3>
+          <template lwc:if={hasFiles}>
+            <ul class="slds-has-dividers_bottom-space">
+              <template for:each={fileRows} for:item="file">
+                <li key={file.contentVersionId} class="slds-item">
+                  <div class="slds-grid slds-grid_vertical-align-center">
+                    <div class="slds-col slds-truncate" title={file.label}>
+                      <span>{file.label}</span>
+                      <span class="slds-text-body_small slds-text-color_weak">
+                        &nbsp;· {file.sizeLabel}</span
+                      >
+                    </div>
+                    <div
+                      class="slds-col slds-no-flex slds-grid slds-grid_vertical-align-center"
+                    >
+                      <template lwc:if={file.latestJobId}>
+                        <a href={file.jobUrl} class="slds-m-right_x-small">
+                          <c-sfdc-dcx-status-badge
+                            status={file.latestJobStatus}
+                          ></c-sfdc-dcx-status-badge>
+                        </a>
+                      </template>
+                      <template lwc:if={file.canProcess}>
+                        <lightning-button
+                          label={file.processLabel}
+                          data-id={file.contentVersionId}
+                          onclick={processFile}
+                          disabled={submitting}
+                          variant="neutral"
+                        ></lightning-button>
+                      </template>
+                      <template lwc:elseif={file.unsupportedLabel}>
+                        <span class="slds-text-body_small slds-text-color_weak"
+                          >{file.unsupportedLabel}</span
+                        >
+                      </template>
+                    </div>
+                  </div>
+                </li>
+              </template>
+            </ul>
+          </template>
+          <template lwc:else>
+            <p class="slds-text-color_weak">
+              No files are attached to this record yet.
+            </p>
+          </template>
+
+          <h3
+            class="slds-text-title_caps slds-m-top_medium slds-m-bottom_x-small"
+          >
+            Processing jobs
+          </h3>
+        </div>
+        <c-sfdc-dcx-job-list
+          rows={jobs}
+          empty-message="No documents from this record have been processed yet."
+          aria-label="Processing jobs for this record"
+        ></c-sfdc-dcx-job-list>
+      </template>
+    </lightning-card>
+  </div>
+</template>

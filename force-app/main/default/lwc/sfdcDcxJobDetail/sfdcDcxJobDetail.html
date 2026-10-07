@@ -1,0 +1,308 @@
+<template>
+  <div class="sfo-job">
+    <template lwc:if={loading}>
+      <div class="slds-is-relative sfo-spinner-box">
+        <lightning-spinner
+          alternative-text="Loading job"
+          size="medium"
+        ></lightning-spinner>
+      </div>
+    </template>
+    <template lwc:if={loadError}>
+      <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+        <h2>{loadError}</h2>
+      </div>
+    </template>
+    <template lwc:if={job}>
+      <lightning-card>
+        <div
+          slot="title"
+          class="slds-grid slds-grid_vertical-align-center slds-wrap"
+        >
+          <c-sfdc-dcx-status-badge
+            status={job.status}
+          ></c-sfdc-dcx-status-badge>
+          <span class="slds-m-left_small slds-text-heading_small"
+            >{job.name}</span
+          >
+        </div>
+        <div slot="actions" class="slds-grid slds-wrap sfo-actions">
+          <template lwc:if={job.actions.canRefresh}>
+            <lightning-button
+              variant="brand"
+              label="Check review status"
+              icon-name="utility:refresh"
+              onclick={refresh}
+              disabled={busy}
+            ></lightning-button>
+          </template>
+          <template lwc:if={job.reviewUrl}>
+            <a
+              class="slds-button slds-button_neutral"
+              href={job.reviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <lightning-icon
+                icon-name="utility:new_window"
+                size="x-small"
+                class="slds-button__icon slds-button__icon_left"
+                alternative-text=""
+              ></lightning-icon>
+              Open review in provider
+            </a>
+          </template>
+          <template lwc:if={job.actions.canResume}>
+            <lightning-button
+              label="Resume processing"
+              icon-name="utility:play"
+              onclick={resume}
+              disabled={busy}
+            ></lightning-button>
+          </template>
+          <template lwc:if={job.actions.canRetry}>
+            <lightning-button
+              variant="brand"
+              label="Try again"
+              icon-name="utility:redo"
+              onclick={retry}
+              disabled={busy}
+            ></lightning-button>
+          </template>
+          <template lwc:if={job.actions.canReprocess}>
+            <lightning-button
+              label="Process again"
+              icon-name="utility:replay"
+              onclick={reprocess}
+              disabled={busy}
+            ></lightning-button>
+          </template>
+        </div>
+
+        <div class="slds-p-horizontal_medium">
+          <p class="slds-text-heading_small slds-m-bottom_small">
+            {info.summary}
+          </p>
+          <lightning-progress-indicator
+            current-step={currentStep}
+            type="path"
+            has-error={hasError}
+            variant="base"
+          >
+            <template for:each={steps} for:item="step">
+              <lightning-progress-step
+                key={step.value}
+                label={step.label}
+                value={step.value}
+              ></lightning-progress-step>
+            </template>
+          </lightning-progress-indicator>
+
+          <template lwc:if={guidance}>
+            <div class={guidanceClass} role="status">
+              <h3 class="slds-text-heading_small">{guidance.title}</h3>
+              <p>{guidance.detail}</p>
+              <template lwc:if={guidanceForAdmin}>
+                <p
+                  class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small"
+                >
+                  Error code {job.errorCode}
+                </p>
+              </template>
+            </div>
+          </template>
+
+          <template lwc:if={isActive}>
+            <p
+              class="slds-m-top_small slds-text-body_small slds-text-color_weak"
+              aria-live="polite"
+            >
+              <template lwc:if={job.nextAttemptAt}>
+                Next automatic check:&nbsp;<lightning-formatted-date-time
+                  value={job.nextAttemptAt}
+                  hour="2-digit"
+                  minute="2-digit"
+                  second="2-digit"
+                ></lightning-formatted-date-time
+                >.&nbsp;
+              </template>
+              This page updates automatically; you can leave and come back
+              later.
+            </p>
+          </template>
+
+          <template lwc:if={isReview}>
+            <div
+              class="slds-box slds-box_x-small slds-theme_shade slds-m-top_small"
+              role="note"
+            >
+              <p>
+                <strong>Human review happens in the provider.</strong> The data
+                below is not final yet. After the review is finished in the
+                provider, choose <em>Check review status</em> to bring the final
+                result into Salesforce.
+              </p>
+            </div>
+          </template>
+
+          <template lwc:if={actionMessage}>
+            <p class="slds-m-top_small slds-text-color_weak" aria-live="polite">
+              {actionMessage}
+            </p>
+          </template>
+        </div>
+      </lightning-card>
+
+      <template lwc:if={job.result}>
+        <lightning-card
+          title={resultTitle}
+          icon-name="utility:summary"
+          class="slds-m-top_small"
+        >
+          <div slot="actions">
+            <template lwc:if={providerDocumentType}>
+              <span class="slds-badge">{providerDocumentType}</span>
+            </template>
+          </div>
+          <div class="slds-p-horizontal_medium">
+            <c-sfdc-dcx-result-view
+              result={job.result}
+            ></c-sfdc-dcx-result-view>
+          </div>
+        </lightning-card>
+      </template>
+
+      <template lwc:if={job.actions.canApply}>
+        <div class="slds-m-top_small">
+          <c-sfdc-dcx-mapping-panel
+            job-id={job.id}
+            applied-at={job.appliedAt}
+            onapplied={handleApplied}
+          ></c-sfdc-dcx-mapping-panel>
+        </div>
+      </template>
+
+      <lightning-card
+        title="Document"
+        icon-name="utility:file"
+        class="slds-m-top_small"
+      >
+        <div class="slds-p-horizontal_medium">
+          <dl class="slds-list_horizontal slds-wrap">
+            <dt class="slds-item_label slds-text-color_weak">File</dt>
+            <dd class="slds-item_detail">
+              <template lwc:if={job.file.accessible}>
+                <a href="#" onclick={previewFile}>{fileLabel}</a>
+                <span class="slds-text-color_weak"> · {fileSize}</span>
+                <template lwc:if={newerVersion}>
+                  <span class="slds-badge slds-m-left_x-small"
+                    >A newer version exists</span
+                  >
+                </template>
+              </template>
+              <template lwc:else>
+                {fileLabel}
+                <span class="slds-text-color_weak">
+                  · no longer available to you</span
+                >
+              </template>
+            </dd>
+            <dt class="slds-item_label slds-text-color_weak">Linked record</dt>
+            <dd class="slds-item_detail">
+              <template lwc:if={sourceUrl}>
+                <a href={sourceUrl}>{sourceLabel}</a>
+                <span class="slds-text-color_weak">
+                  &nbsp;· {job.source.objectLabel}</span
+                >
+              </template>
+              <template lwc:elseif={job.source}>
+                {job.source.objectLabel} record not available to you
+              </template>
+              <template lwc:else>
+                <span class="slds-text-color_weak">None</span>
+              </template>
+            </dd>
+            <dt class="slds-item_label slds-text-color_weak">Document type</dt>
+            <dd class="slds-item_detail">{job.documentType}</dd>
+            <dt class="slds-item_label slds-text-color_weak">Submitted</dt>
+            <dd class="slds-item_detail">
+              <lightning-formatted-date-time
+                value={job.createdDate}
+                year="numeric"
+                month="short"
+                day="2-digit"
+                hour="2-digit"
+                minute="2-digit"
+              ></lightning-formatted-date-time>
+              <template lwc:if={job.ownerName}> · {job.ownerName}</template>
+            </dd>
+            <template lwc:if={job.completedAt}>
+              <dt class="slds-item_label slds-text-color_weak">Finished</dt>
+              <dd class="slds-item_detail">
+                <lightning-formatted-date-time
+                  value={job.completedAt}
+                  year="numeric"
+                  month="short"
+                  day="2-digit"
+                  hour="2-digit"
+                  minute="2-digit"
+                ></lightning-formatted-date-time>
+              </dd>
+            </template>
+          </dl>
+
+          <div
+            class="slds-section slds-m-top_small"
+            data-open={diagnosticsOpen}
+          >
+            <h3 class="slds-section__title">
+              <button
+                class="slds-button slds-section__title-action"
+                aria-expanded={diagnosticsExpanded}
+                onclick={toggleDiagnostics}
+              >
+                <lightning-icon
+                  icon-name={diagnosticsIcon}
+                  size="x-small"
+                  class="slds-m-right_x-small"
+                  alternative-text=""
+                ></lightning-icon>
+                <span class="slds-truncate" title="Diagnostics"
+                  >Diagnostics</span
+                >
+              </button>
+            </h3>
+            <template lwc:if={diagnosticsOpen}>
+              <dl class="slds-list_horizontal slds-wrap slds-p-around_x-small">
+                <dt class="slds-item_label slds-text-color_weak">
+                  Provider job ID
+                </dt>
+                <dd class="slds-item_detail">{providerJobLabel}</dd>
+                <dt class="slds-item_label slds-text-color_weak">
+                  Correlation ID
+                </dt>
+                <dd class="slds-item_detail">{job.correlationId}</dd>
+                <dt class="slds-item_label slds-text-color_weak">
+                  Remote attempts
+                </dt>
+                <dd class="slds-item_detail">{job.attemptCount}</dd>
+                <template lwc:if={job.errorCode}>
+                  <dt class="slds-item_label slds-text-color_weak">
+                    Error code
+                  </dt>
+                  <dd class="slds-item_detail">{job.errorCode}</dd>
+                </template>
+                <template lwc:if={job.reviewPath}>
+                  <dt class="slds-item_label slds-text-color_weak">
+                    Review path
+                  </dt>
+                  <dd class="slds-item_detail">{job.reviewPath}</dd>
+                </template>
+              </dl>
+            </template>
+          </div>
+        </div>
+      </lightning-card>
+    </template>
+  </div>
+</template>
