@@ -3,11 +3,36 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.2 — 2026-10-07
 
-Documentation, tooling and community changes only. No changes to the Salesforce
-app (`force-app/`), its metadata, `/connect/v1` or the reference provider.
+Two tooling fixes found by running the public documentation end to end against a real
+public HTTPS provider, plus documentation. No changes to the Salesforce app
+(`force-app/`), its metadata or `/connect/v1`. Orgs on 1.0.1 do not need to redeploy.
 
+### Fixes
+
+* **Install script** failed with a Python `JSONDecodeError` and a misleading *Not
+  authenticated* message when `FORCE_COLOR` was set (common in CI and some terminals): the
+  CLI then colours its JSON, and `FORCE_COLOR` beats `NO_COLOR`. `install.sh`,
+  `validate-scratch.sh` and `validate-preview.sh` now clear it, and unreadable CLI output is
+  explained instead of printing a traceback. The tests no longer depend on the caller's
+  environment.
+* **Reference provider container** exited with `Permission denied` when built from files
+  with restrictive modes (a checkout under `umask 077`): `COPY` keeps the host mode and the
+  image runs as a non-root user. The Dockerfile now makes `server.py` readable, and CI builds
+  from a mode-600 file to keep it that way.
+
+### Documentation and validation
+
+* **Public-HTTPS end-to-end validation** is recorded in
+  [testing](docs/testing.md#recorded-public-https-run-102-7-october-2026): public conformance
+  12/12, and a fresh evaluator using only the documentation reached a Completed job.
+* **Tested hosting example (Railway)** with exact commands, kept apart from the generic
+  host requirements ([reference provider README](examples/mock-provider/README.md#tested-example-railway)).
+  The credential goes in through stdin, so it is never echoed.
+* **Quickstart:** a fastest-path summary, the upload dialog's **Done** step (files are
+  submitted only then), that *HTTP 404* on **Connected** is expected, and that install
+  already completes Configuration steps 4 and 5.
 * **HTTP Basic authentication is now documented, with exact Setup steps**
   ([configuration](docs/configuration.md#authentication-schemes)). It was
   claimed before but never explained. Verified in a scratch org against a
