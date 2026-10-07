@@ -3,7 +3,9 @@
 FROM python:3.12-slim
 WORKDIR /app
 COPY server.py .
-RUN useradd --system --home /data app && mkdir -p /data && chown app /data
+# COPY keeps the host file mode. Checkouts made under a restrictive umask (077) would leave server.py
+# unreadable for the non-root user below, so make it readable regardless of the host.
+RUN chmod 0644 server.py && useradd --system --home /data app && mkdir -p /data && chown app /data
 USER app
 ENV HOST=0.0.0.0 PORT=8787 MOCK_PROVIDER_DB=/data/jobs.sqlite3 PYTHONUNBUFFERED=1
 EXPOSE 8787
