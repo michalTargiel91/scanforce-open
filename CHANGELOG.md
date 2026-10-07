@@ -3,6 +3,35 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Documentation, tooling and community changes only. No changes to the Salesforce
+app (`force-app/`), its metadata, `/connect/v1` or the reference provider.
+
+* **HTTP Basic authentication is now documented, with exact Setup steps**
+  ([configuration](docs/configuration.md#authentication-schemes)). It was
+  claimed before but never explained. Verified in a scratch org against a
+  public HTTPS echo service: Basic (parameters entered through the Setup UI),
+  a raw key in another header, and the shipped Bearer formula all authenticate;
+  a wrong password gives 401, and moving the endpoint to another origin removes
+  the stored parameters. OAuth 2.0 client credentials and mutual TLS are now
+  labelled untested instead of advertised.
+* **Reference provider hosting requirements** are spelled out (public HTTPS,
+  `PORT`, one instance, no 200 health check) in the
+  [reference provider README](examples/mock-provider/README.md#in-a-container-for-salesforce).
+* **DocSolved.ai guide:** connector keys are issued on request (request
+  template added); the key-scope and quota statements were made precise.
+* **Documentation fixes:** a second-terminal command that ran with an empty
+  token, the demo's record requirement for *Apply*, 5 MB versus 5 MiB, the
+  200-user access grant limit, CLI and Bash prerequisites, pending Apex jobs on
+  any re-run of the install script, and wording that implied the unlocked
+  package is committed.
+* **New** `scripts/check-docs.py`: offline link, anchor and repository-path
+  checker, part of `npm run lint` and CI (`--external` for a manual check of
+  web links).
+* **Dependabot** groups `@babel/*` and the exactly-pinned formatter separately
+  so one blocked bump no longer holds back routine updates.
+
 ## 1.0.1 — 2026-10-07
 
 Tooling fixes and adoption material. No changes to the Salesforce app

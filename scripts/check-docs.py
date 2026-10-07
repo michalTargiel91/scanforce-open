@@ -31,6 +31,8 @@ REPO_PATH = re.compile(
 )
 # Paths that are created or chosen by the reader, or are placeholders.
 PATH_EXEMPT = ("provider-config-install", "deployment-settings-install")
+# Hosts that answer 403 to scripted clients but work in a browser; checked by hand.
+BOT_BLOCKED_HOSTS = ("developer.salesforce.com",)
 
 
 def tracked_markdown():
@@ -137,6 +139,8 @@ def check_external(files):
     problems = []
     for url, where in sorted(urls.items()):
         if "example.com" in url or "YOUR-" in url or url.endswith(".example"):
+            continue
+        if any(f"//{host}/" in url for host in BOT_BLOCKED_HOSTS):
             continue
         status = None
         for method in ("HEAD", "GET"):
