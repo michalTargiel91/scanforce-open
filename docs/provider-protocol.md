@@ -62,6 +62,12 @@ Idempotency-Key: 9f2c...64 hex characters...e1
 | `X-Correlation-Id` | 32 lowercase hex characters, generated once per Salesforce job and repeated on every request for that job. Contains no content or identity. Log it to correlate support cases. |
 | `Idempotency-Key` | 64 lowercase hex characters (a SHA-256 digest). Opaque to the provider. See [section 5](#5-idempotency). |
 
+Salesforce sends every header above on every submit, so a provider may rely on
+them. A provider that is stricter than this table should name the offending
+header in its error message. The reference provider answers 400
+`INVALID_REQUEST` when `X-File-Name`, `X-Source-Id` or `Idempotency-Key` is
+missing, or when any header value is not printable ASCII.
+
 Respond with **202 Accepted** (200 is also accepted) and the job identity:
 
 ```json

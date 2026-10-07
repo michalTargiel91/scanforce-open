@@ -11,13 +11,14 @@ a first processed document. It has four parts:
 
 Plan about 15 minutes once you have a provider: a DocSolved.ai key (issued on
 request, so ask early) or an HTTPS endpoint. Deploying the reference provider
-for a first evaluation adds about as much again.
+for a first evaluation typically adds 20 to 40 minutes if you already have an
+account on a container host.
 
 ## Before you start
 
 | You need | Notes |
 |---|---|
-| A Salesforce org | Lightning Experience, Salesforce Files and Apex, API 67.0 (Summer '26) or later. A free [Developer Edition](https://developer.salesforce.com/signup), a sandbox or a scratch org is ideal for a first try. With a Dev Hub: `sf org create scratch --target-dev-hub my-hub --definition-file config/project-scratch-def.json --alias my-org --duration-days 7` (after cloning, below). |
+| A Salesforce org | Lightning Experience, Salesforce Files and Apex, API 67.0 (Summer '26) or later. A free [Developer Edition](https://developer.salesforce.com/signup), a sandbox or a scratch org is ideal for a first try. |
 | System Administrator access | To deploy metadata, manage Named/External Credentials, assign permission sets and schedule Apex. |
 | [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf` 2.x; CI tests with 2.151.7), Git, Bash, Python 3 | The install script is Bash and uses `python3` to read CLI output. Python 3.10+ runs the reference provider's checker and tools. |
 | A provider | DocSolved.ai key **or** a `/connect/v1` endpoint on public HTTPS. You can install first and connect later. |
@@ -28,6 +29,8 @@ for a first evaluation adds about as much again.
 git clone https://github.com/michalTargiel91/scanforce-open.git
 cd scanforce-open
 sf org login web --alias my-org        # sandboxes: add --instance-url https://test.salesforce.com
+# Scratch org instead (needs a Dev Hub; skip the login line above):
+#   sf org create scratch --target-dev-hub my-hub --definition-file config/project-scratch-def.json --alias my-org --duration-days 7
 ```
 
 Choose the line for your provider:
@@ -56,6 +59,10 @@ ScanForce Open is installed. Next steps:
 
 On a fresh scratch org this took about two minutes. Add `--with-examples` to
 also deploy the sample invoice [field mappings](../examples/field-mappings/README.md).
+Forgot it? Deploy them later with
+`sf project deploy start --target-org my-org --source-dir examples/field-mappings`.
+Re-running `install.sh` while the recovery schedule exists needs
+`--allow-pending-jobs` ([troubleshooting](troubleshooting.md#installation)).
 Manual steps, upgrades and uninstall are in [install.md](install.md).
 
 ## B. Connect a provider
@@ -96,7 +103,8 @@ Salesforce, and neither is a private network address.
 
 To evaluate without writing a provider, run the
 [reference provider](../examples/mock-provider/README.md) (synthetic results
-only) on any container platform or server that gives it a public HTTPS URL:
+only) on any container platform, server or temporary tunnel that gives it a public
+HTTPS URL with a certificate from a public CA:
 
 ```bash
 # Build the image from the repository root
@@ -124,11 +132,11 @@ python3 tools/provider-conformance/check_provider.py --base-url https://YOUR-HOS
 > and delete the deployment when you are done. Its results are fixed
 > synthetic values; it does not read your file.
 
-**2. Implement your own provider** when you are ready. Follow
+**Later: implement your own provider.** When you are ready, follow
 [provider-custom.md](provider-custom.md) and check it with the same
 conformance command.
 
-**3. Configure Salesforce.** On the Configuration page:
+**2. Configure Salesforce.** On the Configuration page:
 
 1. **Step 1:** choose **Custom provider**. **Step 2:** enter
    `https://YOUR-HOST/connect` and choose **Save endpoint**.

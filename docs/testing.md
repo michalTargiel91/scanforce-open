@@ -59,8 +59,8 @@ release, run a smoke test against a real HTTPS provider in a scratch org with
 
 1. `DEV_HUB_ALIAS=my-hub KEEP_SCRATCH=1 bash scripts/validate-scratch.sh`, or
    install into a scratch org with `scripts/install.sh`.
-2. Provide an HTTPS endpoint: the mock provider behind an HTTPS reverse proxy or
-   a short-lived hosted container you control (bind `0.0.0.0` there; the token
+2. Provide an HTTPS endpoint: the mock provider behind an HTTPS reverse proxy, a temporary
+   tunnel with a public certificate, or a short-lived hosted container you control (bind `0.0.0.0` there; the token
    comes from the platform's secret store), a staging instance of your
    provider, or a DocSolved.ai test workspace. Never expose the mock with real
    documents, and delete it afterwards.

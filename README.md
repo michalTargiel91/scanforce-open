@@ -68,6 +68,7 @@ git clone https://github.com/michalTargiel91/scanforce-open.git && cd scanforce-
 sf org login web --alias my-org
 bash scripts/install.sh --target-org my-org --provider docsolved
 #   your own provider instead: --endpoint https://provider.example.com/connect
+#   just evaluating? install without either flag, then follow quickstart option 2
 ```
 
 Then open **ScanForce Open → Configuration**, store the provider API key, run

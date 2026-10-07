@@ -47,6 +47,9 @@ docker build -t scanforce-open-reference-provider examples/mock-provider
 docker run --rm -p 127.0.0.1:8787:8787 -e MOCK_PROVIDER_TOKEN scanforce-open-reference-provider  # local check
 ```
 
+If port 8787 is already taken on your machine, change the first number
+(`-p 127.0.0.1:18787:8787`) and use that port in the checker's `--base-url`.
+
 Any host that runs a container and puts public HTTPS in front of it works. The
 host must:
 
