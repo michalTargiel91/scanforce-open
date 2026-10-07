@@ -76,3 +76,5 @@ applies.
 
 **Process again** on a Completed job sends the file once more as a new job. The
 provider may charge for it; the original result stays on the old job.
+
+Administrators: see [troubleshooting](troubleshooting.md) for causes and fixes.

@@ -1,0 +1,37 @@
+{
+  "jobId": "<provider job id>",
+  "status": "completed",
+  "documentType": "invoice",
+  "result": {
+    "documentNumber": "MOCK-INV-0001",
+    "issueDate": "2026-09-30",
+    "dueDate": "2026-10-30",
+    "currency": "EUR",
+    "net": 1000.0,
+    "tax": 230.0,
+    "total": 1230.0,
+    "supplier": {
+      "name": "Example Supplies Ltd",
+      "taxId": "XX0000000000"
+    },
+    "customer": {
+      "name": "Sample Customer Inc"
+    },
+    "lines": [
+      {
+        "description": "Synthetic service A",
+        "quantity": 2,
+        "unitPrice": 250.0,
+        "amount": 500.0
+      },
+      {
+        "description": "Synthetic service B",
+        "quantity": 1,
+        "unitPrice": 500.0,
+        "amount": 500.0
+      }
+    ]
+  },
+  "warnings": [],
+  "reviewUrl": null
+}

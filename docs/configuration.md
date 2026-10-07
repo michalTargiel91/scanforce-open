@@ -10,9 +10,13 @@
 
 Notes:
 
-* Background processing runs as the user who submitted the document, so every
-  user needs **Provider Access**. The recovery schedule runs as the
-  administrator who installed it; that user needs it too.
+* Background processing makes callouts as a ScanForce Open user: the
+  submission starts a chain as the submitter, and a chain continues with the
+  oldest due job of any user. The recovery schedule runs as the administrator
+  who installed it. So every ScanForce Open user, and that administrator,
+  needs **Provider Access**. Record-triggered automation on processing jobs
+  therefore runs as whichever of these users completed the job, not
+  necessarily the submitter.
 * No permission set grants create, edit or delete on processing jobs. Status and
   results are written only by ScanForce Open services.
 * Managing credentials additionally needs Salesforce's own permissions

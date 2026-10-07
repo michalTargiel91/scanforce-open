@@ -19,15 +19,22 @@ All actions are in the **ScanForce Open** category of the Flow action picker.
 
 ### Pattern: process every invoice attached to an Opportunity
 
+Ready to deploy and tested: [examples/flows](../examples/flows/README.md).
+
 1. Record-triggered Flow on **Content Version**, after save, when a record is
-   created, with an entry condition that `FirstPublishLocationId` belongs to an
-   Opportunity (for example a formula `BEGINS({!$Record.FirstPublishLocationId}, '006')`).
-2. **Process Salesforce File** with ContentVersion ID `{!$Record.Id}`, source
-   record `{!$Record.FirstPublishLocationId}`, document type `invoice`.
-3. Store the returned processing job ID if later steps need it.
+   created, with the entry condition `{!$Permission.SfdcDcx_Use}` so users
+   without ScanForce Open are skipped. Do not filter on
+   `FirstPublishLocationId`: Salesforce does not expose it to Flow formulas.
+2. **Get Records** of **Content Document Link** where `ContentDocumentId`
+   equals `{!$Record.ContentDocumentId}`, loop over them, and keep links whose
+   `LinkedEntityId` begins with `006`.
+3. **Process Salesforce File** with ContentVersion ID `{!$Record.Id}`, source
+   record = the link's `LinkedEntityId`, document type `invoice`.
 
 The submit runs as the user who uploaded the file, so that user needs the
-ScanForce Open User and Provider Access permission sets.
+ScanForce Open User and Provider Access permission sets. Unsupported file
+types come back as `success = false` with `UNSUPPORTED_FILE_TYPE`; they never
+fail the upload.
 
 ### Pattern: act on completed results
 
@@ -37,7 +44,8 @@ ScanForce Open User and Provider Access permission sets.
 2. Put side effects on an **asynchronous path** so the job update commits first
    and a failing Flow cannot roll back processing.
 3. **Apply ScanForce Open Field Mappings** or **Get Extracted Value**, then your
-   own logic.
+   own logic. The [example apply Flow](../examples/flows/README.md) does this
+   for Opportunities.
 
 Never treat `Review Required` as success. Handle it in its own branch (for
 example notify a reviewer with a link to the job).
@@ -54,14 +62,16 @@ Id jobId = SfdcDcx_Api.submit(contentVersionId, opportunityId, 'invoice');
 SfdcDcx_ProcessingService.SubmitRequest request = new SfdcDcx_ProcessingService.SubmitRequest();
 request.contentVersionId = contentVersionId;
 request.documentType = 'auto';
+// request.reprocess = true;  // send the same file again as new provider work (UI: Process again)
 List<SfdcDcx_ProcessingService.SubmitResult> results =
     SfdcDcx_Api.submitAll(new List<SfdcDcx_ProcessingService.SubmitRequest>{ request });
 
 // Read a result (null until Completed or Review Required).
 SfdcDcx_ResultReader.Envelope envelope = SfdcDcx_Api.getResult(jobId);
-if (envelope != null && envelope.valid) {
+if (envelope != null && envelope.valid && envelope.providerStatus == 'completed') {
     Object total = SfdcDcx_ResultReader.valueAt(envelope.result, 'total');
 }
+// providerStatus 'review_required': the values are unreviewed; do not act on them yet.
 
 // After provider review; resume due work; apply mappings.
 SfdcDcx_Api.refresh(new Set<Id>{ jobId });
@@ -84,6 +94,35 @@ Rejection codes from submit: `INVALID_CONTENT_VERSION`, `FILE_NOT_ACCESSIBLE`,
 `BATCH_LIMIT_EXCEEDED`, `TOO_MANY_SOURCE_OBJECT_TYPES`, `JOB_CREATION_FAILED`.
 Processing error codes are listed in the [protocol](provider-protocol.md#6-errors)
 plus `POLLING_TIMEOUT`, `SOURCE_FILE_NOT_FOUND` and `INVALID_SOURCE_FILE`.
+
+Apply-mapping result codes (`ApplyResult.errorCode`, Flow *Error code*):
+`NOT_COMPLETED`, `NO_RESULT`, `NO_SOURCE_RECORD`, `NO_MAPPINGS`,
+`JOB_NOT_ACCESSIBLE`, `SOURCE_RECORD_NOT_ACCESSIBLE`, `DUPLICATE_SOURCE_RECORD`,
+`UNKNOWN_OBJECT`, `UPDATE_FAILED`, `BATCH_LIMIT_EXCEEDED` and
+`TOO_MANY_OBJECT_TYPES`. Per-field preview states are `READY`, `UNCHANGED`,
+`NO_VALUE`, `INVALID_FIELD`, `UNKNOWN_FIELD`, `NOT_UPDATEABLE`,
+`UNSUPPORTED_TYPE`, `CONVERSION_ERROR` and `DUPLICATE_TARGET`.
+
+Runnable scripts using this API: [examples/apex](../examples/README.md#apex-scripts).
+
+## Stable surface in v1
+
+Within 1.x these keep their names, inputs, outputs and meaning (additions are
+possible):
+
+| Surface | Stable parts |
+|---|---|
+| Flow actions | The five actions above: API names, inputs and outputs. |
+| Apex | `SfdcDcx_Api` (all methods), `SfdcDcx_ProcessingService.SubmitRequest` / `SubmitResult`, `SfdcDcx_ResultReader.Envelope`, `parse`, `valueAt`, `view`, `SfdcDcx_FieldMappingService.ApplyResult`, `SfdcDcx_Api.ApiException`, `SfdcDcx_Submit.ConnectorException`, `SfdcDcx_RecoveryScheduler.install` / `uninstall`. |
+| Data | `SfdcDcx_Processing_Job__c` fields for reading (`Status__c` values, `Error_Code__c`, `Document_Type__c`, `Source_File_Id__c`, `Source_Record_Id__c`, `Result_JSON__c`, `Review_URL__c`, `Correlation_Id__c`, `Completed_At__c`, `Applied_At__c`), the `SfdcDcx_Field_Mapping__mdt` fields, error codes listed on this page. |
+| Configuration | Permission sets, custom permissions `SfdcDcx_Use` / `SfdcDcx_Admin`, Named Credential `SfdcDcx_Provider`, External Credential `SfdcDcx_ProviderAuth` (principal `Provider`, parameter `Token`). |
+| Protocol | [`/connect/v1`](provider-protocol.md). |
+
+Everything else (controllers, the worker, gateway, selectors, domain classes,
+internal fields such as `Submission_Key__c`, `Dedup_Hash__c` and
+`Next_Attempt_At__c`, LWC internals) is implementation detail and may change
+in any release. Never write to processing jobs. Only ScanForce Open services
+change them.
 
 ## Result format
 

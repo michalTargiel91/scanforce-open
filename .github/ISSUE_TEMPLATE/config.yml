@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Setup or usage question
+    url: https://github.com/michalTargiel91/scanforce-open/discussions/categories/q-a
+    about: Ask in Discussions Q&A. Check docs/troubleshooting.md first.
   - name: Report a security vulnerability
-    url: https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability
-    about: Use the repository's private vulnerability reporting (Security tab). Never post secrets or customer data in issues.
+    url: https://github.com/michalTargiel91/scanforce-open/security/advisories/new
+    about: Report privately. Never post secrets, documents or customer data in issues.

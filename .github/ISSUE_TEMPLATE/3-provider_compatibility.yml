@@ -1,0 +1,38 @@
+name: Provider compatibility
+description: Building or running a /connect/v1 provider, a protocol ambiguity, or a provider that behaves differently in Salesforce
+labels: [provider-compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For general provider discussion, use Discussions. Use this form for concrete compatibility problems or protocol gaps.
+        **Never include tokens, provider credentials or real documents.** Synthetic examples only.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Type
+      options: [Conformance checker fails or seems wrong, Conformant provider fails in Salesforce, Protocol is ambiguous or underspecified, Reference provider issue, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: conformance
+    attributes:
+      label: Conformance checker output
+      description: "Run: python3 tools/provider-conformance/check_provider.py --base-url ... --json (it never prints the token). Paste the output, redacting the host if you want."
+      render: json
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What Salesforce did and what the provider sent
+      description: Job status and error code in Salesforce, the HTTP status and a synthetic or redacted response body, and the endpoint (submit, status, result, connection check).
+    validations:
+      required: true
+  - type: input
+    id: section
+    attributes:
+      label: Protocol section involved
+      placeholder: "§5 Idempotency"
+  - type: input
+    id: version
+    attributes:
+      label: ScanForce Open version or commit

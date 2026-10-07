@@ -1,0 +1,46 @@
+name: Installation or setup problem
+description: install.sh, deployment, permissions, credentials or Test connection do not work
+labels: [installation]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [docs/troubleshooting.md](https://github.com/michalTargiel91/scanforce-open/blob/main/docs/troubleshooting.md) first.
+        **Never paste API keys, tokens, org IDs, usernames or instance URLs.** Redact CLI output before posting.
+  - type: dropdown
+    id: step
+    attributes:
+      label: Where it fails
+      options: [install.sh or deployment, Apex tests during deployment, Permission sets or app access, Configuration page (endpoint or API key), Test connection, First document never completes, Upgrade, Uninstall]
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or action, and the output or message
+      description: The command you ran (aliases are fine) and the redacted error, or the exact Configuration/Test connection message.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: org
+    attributes:
+      label: Org type
+      options: [Developer Edition, Scratch org, Sandbox, Production, Other]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ScanForce Open version or commit, Salesforce CLI version (sf --version)
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options: [DocSolved.ai, Custom provider, Reference provider, Not configured yet]
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you already tried

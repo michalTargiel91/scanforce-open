@@ -20,7 +20,7 @@ The [protocol](provider-protocol.md) defines headers, limits, error codes and
 the review lifecycle precisely. The parts teams most often get wrong:
 
 1. **Idempotency is durable and scoped to the credential.** Store the
-   `Idempotency-Key`, a fingerprint of bytes and type hint, and your job ID in
+   `Idempotency-Key`, a fingerprint of bytes, content type and type hint, and your job ID in
    one transaction protected by a unique constraint before replying. Replays
    return the same job; changed content under the same key is 409.
 2. **Authenticate before lookup** and answer unknown jobs with 404 `NOT_FOUND`.
@@ -40,13 +40,13 @@ the review lifecycle precisely. The parts teams most often get wrong:
 
 ## Start from the reference implementation
 
-[`examples/mock-provider`](../examples/mock-provider/README.md) is a
-dependency-free Python implementation of every rule above, including SQLite
-idempotency, lost-acknowledgement handling, a review page and synthetic
-results. Read `server.py` next to the protocol, then replace the synthetic
-parts with your extraction pipeline. It is test tooling and needs production
-hardening (TLS termination, real storage, logging policy, quotas) before use
-with real documents.
+The [reference provider (Provider Starter)](../examples/mock-provider/README.md)
+is a dependency-free Python implementation of every rule above in one file. It
+includes SQLite idempotency, lost-acknowledgement handling, a review page and
+synthetic results. Its README maps each protocol section to the code, and
+lists what to replace and what production adds (TLS termination, real
+storage, quotas, logging policy). A `Dockerfile` lets you run it on any HTTPS
+host to evaluate Salesforce end to end before you write any code.
 
 Typical structure of a production provider:
 
@@ -65,11 +65,18 @@ python3 tools/provider-conformance/check_provider.py \
   --base-url https://provider.example.com/connect --document-type auto
 ```
 
-The checker submits a few tiny synthetic PDFs (one accepted job, one conflict,
-one unsupported type), follows the job and validates every response. Use
+The checker submits a few tiny synthetic documents (one accepted job, one conflict,
+one unsupported type), follows the job and validates every response. Each
+failure names the endpoint, the expected behaviour and a fix. Exit code 0
+means conformant. Run it in your CI as described in its
+[README](../tools/provider-conformance/README.md#in-your-providers-ci). Use
 `--connection-only` for authentication and lookup checks without submitting
 anything, and `--auth-header X-API-Key --auth-scheme ""` if your provider uses
-a raw key header. See [tools/provider-conformance](../tools/provider-conformance/README.md).
+a raw key header.
+
+Tell other ScanForce Open users about your provider in
+[Discussions](https://github.com/michalTargiel91/scanforce-open/discussions), and
+report protocol ambiguities with the **Provider compatibility** issue template.
 
 ## Connect Salesforce to your provider
 

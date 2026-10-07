@@ -3,6 +3,62 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## 1.0.1 — 2026-10-07
+
+Tooling fixes and adoption material. No changes to the Salesforce app
+(`force-app/`), its metadata or `/connect/v1`. Orgs on 1.0.0 do not need to
+redeploy.
+
+### Fixes
+
+* **Install script** printed "Assigned ScanForce Open Administrator and
+  Provider Access" even when an assignment failed. This happens when the
+  Provider Access permission set does not exist because the credential
+  bootstrap was skipped for an existing credential. It now warns, names the
+  missing set and shows how to deploy it. `--target-org` without a value
+  shows usage instead of exiting silently. An endpoint that does not end in
+  `/connect` gets a hint.
+* **Reference provider** answered 404 `NOT_FOUND` on every unknown path, so a
+  base URL without `/connect` passed the connection check. Paths outside
+  `/connect/v1/` now get a plain 404, which the checker and Salesforce's
+  **Test connection** report as a wrong base URL.
+* **Conformance checker** no longer crashes with a Python traceback when the
+  provider cannot be reached (DNS, TCP, TLS or timeout). It explains what to
+  check and exits with code 2.
+* **Developer guide:** the "process every invoice attached to an Opportunity"
+  pattern used `FirstPublishLocationId` in a ContentVersion Flow entry
+  condition, which Salesforce rejects ("Field FirstPublishLocationId does not
+  exist"). It now looks up `ContentDocumentLink` records, as in the new tested
+  example Flow.
+
+### Provider builders
+
+* Conformance failures and warnings now name the endpoint, the expected
+  behaviour and a fix with a protocol reference, in text and `--json`
+  output. New warnings: non-JSON `Content-Type`, and an absolute `reviewUrl`
+  on another origin (stored but never offered by Salesforce). The README has
+  a CI recipe.
+* The mock provider is documented as the **reference provider (Provider
+  Starter)**: a reading guide from protocol rules to code, and what to
+  replace for production. New `HOST` setting (default `127.0.0.1`) and a
+  `Dockerfile` (non-root) for evaluation behind HTTPS.
+
+### Adoption
+
+* New [quickstart](docs/quickstart.md) with two equal provider paths,
+  [troubleshooting by symptom](docs/troubleshooting.md),
+  [distribution analysis](docs/distribution.md), [roadmap](ROADMAP.md) and
+  [support guide](SUPPORT.md). README rewritten as a landing page with an
+  architecture diagram.
+* Tested [examples](examples/README.md): an Opportunity invoice intake Flow
+  and an apply-on-completion Flow (deployed as Draft), two anonymous Apex
+  scripts, and a synthetic demo invoice with its expected result.
+* Developer guide: the stable v1 surface (Flow, Apex, data, configuration,
+  protocol) is separated from internal classes; apply-mapping result codes
+  are documented.
+* GitHub issue forms for bugs, installation problems, provider compatibility
+  and feature requests; questions go to Discussions.
+
 ## 1.0.0 — 2026-10-07
 
 First final release. It supersedes `1.0.0-rc.1`; there are no schema or

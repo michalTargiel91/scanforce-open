@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <actionCalls>
+        <name>Apply_Field_Mappings</name>
+        <label>Apply ScanForce Open Field Mappings</label>
+        <locationX>308</locationX>
+        <locationY>431</locationY>
+        <actionName>SfdcDcx_ApplyFieldMappings</actionName>
+        <actionType>apex</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>processingJobIds</name>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputParameters>
+        <nameSegment>SfdcDcx_ApplyFieldMappings</nameSegment>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </actionCalls>
+    <apiVersion>67.0</apiVersion>
+    <description>Example (ScanForce Open): when a processing job linked to an Opportunity becomes Completed, apply the active field mappings to that Opportunity after the processing transaction commits. Review Required jobs never match: they are applied only after the provider-side review completes and someone chooses Check review status.</description>
+    <environments>Default</environments>
+    <interviewLabel>ScanForce Open Example: Apply Completed Invoice {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>ScanForce Open Example: Apply Completed Invoice</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <doesRequireRecordChangedToMeetCriteria>true</doesRequireRecordChangedToMeetCriteria>
+        <filterFormula>AND(ISPICKVAL({!$Record.Status__c}, &quot;Completed&quot;), BEGINS({!$Record.Source_Record_Id__c}, &quot;006&quot;))</filterFormula>
+        <object>SfdcDcx_Processing_Job__c</object>
+        <recordTriggerType>Update</recordTriggerType>
+        <scheduledPaths>
+            <connector>
+                <targetReference>Apply_Field_Mappings</targetReference>
+            </connector>
+            <pathType>AsyncAfterCommit</pathType>
+        </scheduledPaths>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Draft</status>
+</Flow>

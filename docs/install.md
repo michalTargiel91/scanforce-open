@@ -4,6 +4,9 @@ ScanForce Open 1.0 is distributed as **source**. You deploy it with the
 Salesforce CLI from this repository. There is no managed package, no namespace
 and no dependency on any previous ScanForce package.
 
+New here? The [quickstart](quickstart.md) walks from clone to first processed
+document. This page is the full reference. Problems: [troubleshooting](troubleshooting.md).
+
 ## Prerequisites
 
 * A Salesforce org with Lightning Experience, Salesforce Files and Apex
@@ -118,4 +121,5 @@ sf package version create --package "ScanForce Open" --installation-key-bypass -
 ```
 
 Keep the generated package IDs in your own fork. The original ScanForce managed
-packages are retired and must not be reused.
+packages are retired and must not be reused. For the project's own plans,
+see [distribution options](distribution.md).

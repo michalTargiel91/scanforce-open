@@ -9,3 +9,5 @@ examples/mock-provider/**
 **/__tests__/**
 **/jsconfig.json
 **/*.md
+examples/demo/**
+examples/apex/**

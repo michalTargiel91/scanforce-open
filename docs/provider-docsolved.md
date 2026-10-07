@@ -25,8 +25,10 @@ ScanForce Open authenticates to DocSolved.ai with a **workspace service key**
   review and approval policy applies.
 
 A workspace owner or administrator creates the key. If the API key form in
-your account does not offer the `connector` scope or a workspace, contact
-DocSolved.ai support, which issues the key for your workspace. Copy the key
+your account does not offer the `connector` scope or a workspace (the
+standard Developer Settings form currently does not), ask DocSolved.ai to
+issue one for your workspace: email [hello@synairo.com](mailto:hello@synairo.com)
+with your workspace name. Never send the key itself by email. Copy the key
 once; DocSolved.ai shows it only at creation. Do not paste it into chat,
 tickets, source control or Salesforce fields other than the step below.
 
@@ -62,7 +64,7 @@ Prefer Setup over the Configuration page? Follow
 
 1. Open **ScanForce Open → Workspace**.
 2. Keep **Document type** on *Automatic* (DocSolved.ai classifies the document)
-   and upload a PDF, PNG or JPEG of up to 5 MB.
+   and upload a PDF, PNG or JPEG of up to 5 MiB.
 3. Leave the page if you like. The job moves through Queued and Processing; open
    it to see the extracted fields once it is **Completed**.
 4. If it shows **Review required**, choose **Open review in provider**, sign in

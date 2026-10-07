@@ -1,0 +1,67 @@
+name: Bug report
+description: ScanForce Open does not behave as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never include API keys, tokens, customer documents, extracted values, org IDs or usernames.**
+        Security problems: report privately (see SECURITY.md). Setup questions: Discussions Q&A.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the exact message you saw, for example a job error or a Test connection result.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Upload a 2-page PDF in the Workspace with document type invoice
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ScanForce Open version or commit
+      placeholder: v1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Workspace or job page, Record Documents card, Configuration page, Flow actions, Apex API, Field mappings, Recovery or background processing, Install or upgrade script, Reference provider or conformance checker, Documentation]
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options: [DocSolved.ai, Custom provider, Reference provider, Not relevant]
+    validations:
+      required: true
+  - type: input
+    id: job
+    attributes:
+      label: Job status and error code (if any)
+      placeholder: "Failed / INVALID_PROVIDER_RESPONSE"
+  - type: input
+    id: org
+    attributes:
+      label: Salesforce org type and release
+      placeholder: "Sandbox, Winter '27"
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Other evidence
+      description: Redacted debug log lines, Apex job errors, screenshots without customer data.

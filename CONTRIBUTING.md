@@ -3,6 +3,25 @@
 Thank you for helping improve ScanForce Open. Contributions are accepted under
 the [Apache License 2.0](LICENSE).
 
+## Where to start
+
+Most contributions need **no Salesforce org**: `npm ci && npm test` runs the
+Jest, Python and static suites locally.
+
+* **Try the [quickstart](docs/quickstart.md)** and fix whatever confused you.
+  Documentation fixes from first-time users are among the most valuable
+  contributions.
+* **Issues labelled [`good first issue`](https://github.com/michalTargiel91/scanforce-open/labels/good%20first%20issue)
+  or [`help wanted`](https://github.com/michalTargiel91/scanforce-open/labels/help%20wanted).**
+* **Provider side:** improve the [reference provider](examples/mock-provider/README.md)
+  or the [conformance checker](tools/provider-conformance/README.md) (Python,
+  standard library only). Or tell us in Discussions about a provider you built.
+* **Examples:** a Flow or Apex example for another object or use case, tested
+  in a scratch org (see [examples](examples/README.md)).
+* **Salesforce app:** Apex and LWC in `force-app/`. Discuss larger changes in
+  an issue first, and read [architecture](docs/architecture.md) and the
+  principles below.
+
 ## Principles
 
 * **Provider neutrality is a product invariant.** Salesforce code talks only to
@@ -44,7 +63,10 @@ usernames, tokens, `.sf/`/`.sfdx/` folders or test-result evidence containing
 them. Do not copy code from the retired ScanForce packages or from private
 provider implementations.
 
-## Reporting issues
+## Reporting issues and asking questions
 
-Use GitHub issues for bugs and feature requests (no confidential data). Report
-security problems privately as described in [SECURITY.md](SECURITY.md).
+Questions go to [Discussions](https://github.com/michalTargiel91/scanforce-open/discussions).
+Bugs, installation problems, provider compatibility problems and feature
+requests go to [issues](https://github.com/michalTargiel91/scanforce-open/issues/new/choose),
+with no confidential data. Report security problems privately as described
+in [SECURITY.md](SECURITY.md). See [SUPPORT.md](SUPPORT.md).

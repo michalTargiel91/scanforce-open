@@ -1,0 +1,44 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 985 >>
+stream
+BT /F1 20 Tf 72 740 Td (INVOICE  MOCK-INV-0001) Tj ET
+BT /F1 10 Tf 72 712 Td (SYNTHETIC DEMO DOCUMENT - NOT A REAL INVOICE) Tj ET
+BT /F1 11 Tf 72 670 Td (Supplier: Example Supplies Ltd) Tj ET
+BT /F1 11 Tf 72 654 Td (Tax ID: XX0000000000) Tj ET
+BT /F1 11 Tf 340 670 Td (Customer: Sample Customer Inc) Tj ET
+BT /F1 11 Tf 72 622 Td (Issue date: 2026-09-30) Tj ET
+BT /F1 11 Tf 340 622 Td (Due date: 2026-10-30) Tj ET
+BT /F1 11 Tf 72 580 Td (Description                     Qty    Unit price      Amount) Tj ET
+BT /F1 11 Tf 72 560 Td (Synthetic service A                2        250.00      500.00) Tj ET
+BT /F1 11 Tf 72 544 Td (Synthetic service B                1        500.00      500.00) Tj ET
+BT /F1 11 Tf 72 504 Td (Net                                                   1000.00 EUR) Tj ET
+BT /F1 11 Tf 72 488 Td (Tax                                                    230.00 EUR) Tj ET
+BT /F1 11 Tf 72 466 Td (Total                                                 1230.00 EUR) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001276 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1344
+%%EOF

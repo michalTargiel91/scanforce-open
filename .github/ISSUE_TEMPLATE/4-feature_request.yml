@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an improvement for users, administrators, developers or provider builders
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Open-ended ideas fit Discussions → Ideas. See ROADMAP.md for current direction.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who is affected and what are they trying to do? What do they do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+  - type: dropdown
+    id: neutrality
+    attributes:
+      label: Provider neutrality
+      description: ScanForce Open must keep working with any /connect/v1 provider.
+      options: [No protocol change needed, Needs an additive optional protocol field, Needs a protocol change, Not sure]
+    validations:
+      required: true
