@@ -75,7 +75,26 @@ protocol changes, and an RC installation upgrades by deploying this source.
   code: a workspace key with only the `connector` scope, created through the
   supported key endpoint, accepted the exact request Salesforce sent, and the
   conformance checker passed.
-* Local lane, scratch gate and public CI: see the release notes.
+* The first runtime pass, in a retained development scratch org, exposed the
+  provider-switch and *Test connection* defects above. After the fixes, the
+  whole journey was repeated in a **fresh scratch org created from a clean
+  clone of the public repository** (commit `52f1d14`): configuration and
+  provider switch, Workspace upload, Review Required and **Check review
+  status**, record-page upload with selective field-mapping apply, a
+  minimum-permission user, recovery of a job whose Queueable was aborted, 5 MiB
+  + 1 rejection and no `ContentDistribution`. Every submission's bytes and
+  headers matched the Salesforce records on the provider side.
+* Scratch gate from that clean clone (Salesforce API 67.0): 141 of 141 Apex
+  tests passed, 92 % test-run coverage, 91 % org-wide coverage; then
+  `scripts/install.sh --provider docsolved --with-examples` into the same org.
+* Local lane: ESLint, Prettier, Jest (37 tests), Python suites (mock provider
+  10, conformance checker 5, scripts 25), metadata guardrails, Salesforce Code
+  Analyzer `pmd:Security` (0 findings; 2 documented suppressions), gitleaks
+  (no leaks) and the production dependency audit (0 vulnerabilities). Public CI
+  passed on the release commits.
+* Recovery documentation now explains that a missing key or missing Provider
+  Access surfaces as retried callout failures and how *Test connection* tells
+  them apart.
 
 ## 1.0.0-rc.1 — 2026-10-07 (release candidate)
 

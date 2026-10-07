@@ -28,6 +28,13 @@ on the processing job; any background execution can continue from there.
 While a job is retrying, it stays Queued or Processing with the last temporary
 error code, and the job page explains that ScanForce Open retries automatically.
 
+Salesforce reports a missing provider key, or a submitting user without
+**ScanForce Open Provider Access**, as a callout failure before anything is
+sent. Such jobs retry like a network error and end as **Timed Out**. If jobs
+never reach the provider, run **Test connection** on the Configuration page: it
+reports *No API key stored* or *No access to the provider credential* for these
+cases.
+
 ## Duplicate protection
 
 * **Provider idempotency**: every job has an immutable key; retries reuse it.
