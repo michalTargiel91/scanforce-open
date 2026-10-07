@@ -13,15 +13,16 @@ administrator if the app or its tabs are missing.
    a specific type (for example *invoice*). *Other…* lets you enter a type such
    as `purchase_order`.
 3. **Upload Files** (or drop files): PDF, PNG or JPEG, up to 5 MiB each, up to 25
-   at once. With *Process automatically after upload* on, they are submitted
-   right away. Uploaded files are private to you unless you share them.
+   at once. When Salesforce's upload dialog says the upload is complete, choose
+   **Done**: files are submitted at that moment, and with *Process automatically
+   after upload* on they are processed right away. Uploaded files are private to you unless you share them.
 4. Or choose **Choose from Salesforce Files** to pick files you already have
    access to, then **Process selected**.
 
 The *Last submission* list shows what was accepted, with a reason for anything
 rejected (for example *File is too large*).
 
-To process a file attached to a record, use the **Document processing** card on
+To process a file attached to a record, use the **ScanForce Open Record Documents** card on
 that record's page if your administrator added it: **Attach and process**, or
 **Process** next to an attached file. Results are then linked to the record.
 

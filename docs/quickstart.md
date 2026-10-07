@@ -14,6 +14,14 @@ request, so ask early) or an HTTPS endpoint. Deploying the reference provider
 for a first evaluation typically adds 20 to 40 minutes if you already have an
 account on a container host.
 
+**Fastest way to see it work** (reference provider, synthetic data only):
+deploy the [reference provider](../examples/mock-provider/README.md#in-a-container-for-salesforce)
+and check it with the conformance command in B; run `install.sh` with
+`--with-examples` and no provider flag; on the Configuration page choose
+**Custom provider**, save `https://YOUR-HOST/connect`, store the token (steps 4
+and 5 are already green) and **Test connection**; in the Workspace choose
+**Other… → `invoice`**, upload the synthetic invoice and choose **Done**.
+
 ## Before you start
 
 | You need | Notes |
@@ -58,7 +66,9 @@ ScanForce Open is installed. Next steps:
 ```
 
 On a fresh scratch org this took about two minutes. Add `--with-examples` to
-also deploy the sample invoice [field mappings](../examples/field-mappings/README.md).
+also deploy the sample invoice [field mappings](../examples/field-mappings/README.md);
+it also puts `invoice` in the Workspace document-type list, which is handy with
+the reference provider.
 Forgot it? Deploy them later with
 `sf project deploy start --target-org my-org --source-dir examples/field-mappings`.
 Re-running `install.sh` while the recovery schedule exists needs
@@ -72,6 +82,8 @@ Open the Configuration page:
 ```bash
 sf org open --target-org my-org --path /lightning/n/SfdcDcx_Configuration
 ```
+
+To log in from a different browser, add `--url-only` to print a one-time login URL.
 
 ![Configuration page](images/configuration.png)
 
@@ -89,7 +101,8 @@ DocSolved.ai plan.
    into the External Credential and is never shown again.
 4. **Steps 4 and 5:** grant provider access and install recovery if they are
    not already green.
-5. **Step 6:** **Test connection** → **Connected**.
+5. **Step 6:** **Test connection** → **Connected**. The panel may show *HTTP 404*;
+   that is the expected answer to the check for a job that cannot exist.
 
 ### Option 2 — Your own provider
 
@@ -117,7 +130,9 @@ Deploy the image to a host that gives it a public HTTPS URL, set the
 environment variable `MOCK_PROVIDER_TOKEN` from the host's secret store, and
 keep it to **one running instance**. The
 [reference provider README](../examples/mock-provider/README.md#in-a-container-for-salesforce)
-lists exactly what the host must do. Your base URL is then
+lists exactly what the host must do, and gives a tested example with exact commands
+([Railway](../examples/mock-provider/README.md#tested-example-railway); one option, not
+a requirement). Your base URL is then
 `https://YOUR-HOST/connect`. Check it from your machine before touching
 Salesforce:
 
@@ -144,8 +159,10 @@ conformance command.
    sent as `Authorization: Bearer <token>`. For a raw key in another header or
    HTTP Basic, change the External Credential in Setup instead
    ([configuration](configuration.md#authentication-schemes)).
-3. **Steps 4 and 5:** grant provider access and install recovery.
-4. **Step 6:** **Test connection** → **Connected**.
+3. **Steps 4 and 5:** grant provider access and install recovery, if they are not
+   already green (`install.sh` already did both).
+4. **Step 6:** **Test connection** → **Connected**. The panel may show *HTTP 404*;
+   that is the expected answer to the check for a job that cannot exist.
 
 ## C. Process your first document
 
@@ -157,7 +174,9 @@ conformance command.
      list). Enter `review` instead to try the Review Required flow.
 3. **Upload Files** and choose a PDF, PNG or JPEG of up to 5 MiB. With the
    reference provider, use only synthetic files such as
-   [`examples/demo/synthetic-invoice.pdf`](../examples/demo/README.md).
+   [`examples/demo/synthetic-invoice.pdf`](../examples/demo/README.md). When the
+   upload dialog says the upload is complete, choose **Done**: the job is only
+   created then.
 4. The job appears as **Queued**, then **Processing**, then **Completed**.
    Polling starts after one minute, so the first result usually arrives
    within a few minutes. You can leave the page.

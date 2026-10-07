@@ -67,8 +67,42 @@ Then configure `https://YOUR-HOST/connect` in ScanForce Open and run the
 first. Send **synthetic documents only**, and delete the deployment after your
 evaluation. Do not disable TLS validation anywhere.
 
-The maintainers do not endorse or support a particular hosting platform. If you
-get it running on one, a short recipe in
+#### Tested example: Railway
+
+One example the maintainers ran end to end (conformance over public HTTPS, then the
+whole quickstart to a Completed job). It is **an example, not a requirement or an
+endorsement**: any host that meets the table above works. Railway is a paid platform
+with limited trial credit, so check its current pricing, and delete the project when
+you are done. Tested with Railway CLI 5.63.4; Railway's defaults already meet the
+table (one replica, no sleeping, restart only on failure, `PORT` injected, HTTPS in
+front).
+
+```bash
+# Install the Railway CLI (see railway.com/docs) and sign in once: railway login
+cd examples/mock-provider
+export PROVIDER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"  # keep this shell: Salesforce and the checker need it
+
+railway init --name scanforce-open-reference-provider     # add --workspace NAME if you belong to several
+railway add --service reference-provider < /dev/null     # an empty service, no variables yet
+printf %s "$PROVIDER_TOKEN" | railway variables --service reference-provider --set-from-stdin MOCK_PROVIDER_TOKEN
+railway up --service reference-provider --detach          # builds the Dockerfile in this directory
+railway deployment list --service reference-provider      # wait for SUCCESS (about a minute)
+railway logs --service reference-provider                 # ... listening on http://0.0.0.0:8080
+railway domain --service reference-provider --port 8080   # use the port from that log line; prints your https URL
+```
+
+The token goes in through stdin, so it is never echoed (`railway add --variables`
+prints the value back). Your base URL is `https://<printed-domain>/connect`. Then run the
+conformance checker from the repository root (`PROVIDER_TOKEN` is still set) and continue
+with the [quickstart](../../docs/quickstart.md#option-2--your-own-provider). Do not
+change variables or redeploy while Salesforce jobs are running: a new deployment starts
+with an empty database. When you are done:
+
+```bash
+railway delete --project scanforce-open-reference-provider --yes
+```
+
+If you get it running on another platform, a short recipe in
 [Discussions → Show and tell](https://github.com/michalTargiel91/scanforce-open/discussions/categories/show-and-tell)
 helps the next evaluator.
 

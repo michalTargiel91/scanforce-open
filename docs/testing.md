@@ -122,10 +122,29 @@ echo endpoint, so no provider is needed (use synthetic or demo credentials only)
    *Test connection* without a stored credential gives the documented message, and
    that moving the endpoint to another origin removes the stored parameters.
 
-Recorded for 1.0.1 (October 2026): Bearer (shipped formula), raw key in
+Recorded for 1.0.2 (October 2026): Bearer (shipped formula), raw key in
 `X-API-Key` (Token stored through the Configuration page's Apex method) and HTTP
 Basic (parameters entered through the Setup UI) all authenticated; OAuth 2.0
 client credentials and mutual TLS were not tested.
+
+### Recorded public-HTTPS run (1.0.2, 7 October 2026)
+
+The reference provider, built from the repository's Dockerfile, ran on a temporary Railway
+service with a public HTTPS URL (deleted afterwards), with synthetic data and a throwaway
+credential. Evidence:
+
+* Public conformance checker over HTTPS: 12 of 12 for `auto`, `invoice` and `review`;
+  a wrong credential is rejected.
+* A fresh evaluator who used only the public documentation went from clone to a
+  **Completed** job (scratch org about 11 s, install 118 s, about 2 minutes 15 seconds from
+  upload to Completed) and to a **Review Required** job approved to Completed, with no
+  `ContentDistribution` record.
+* A logging build of the same, unmodified `server.py` recorded the submit it received:
+  Bearer credential accepted, `Content-Type: application/pdf`, body size and MD5 equal
+  to the ContentVersion's `ContentSize` and `Checksum`, and `X-Document-Type`,
+  `X-File-Name`, `X-Source-Id` (the ContentVersion ID), `X-Correlation-Id` and
+  `Idempotency-Key` equal to the job's own fields. Salesforce then made two status polls
+  and one result request, all with the same correlation ID.
 
 ## Release checklist
 

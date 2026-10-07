@@ -131,8 +131,10 @@ are limited to a preset URL and some wording on the Configuration page.
 
 * User actions are authorised in **user mode** (sharing, CRUD/FLS, restriction
   rules). A linked record must be visible to the user and attached to the File.
-* Processing jobs are private and read-only for everyone. Only ScanForce Open
-  services change their status and results.
+* Processing jobs are private and no ScanForce Open permission set grants edit
+  on them; only ScanForce Open services change their status and results.
+  (Salesforce's Modify All Data, which the System Administrator profile includes,
+  overrides this in the standard UI.)
 * Secrets live only in Salesforce External Credentials. A stored key belongs to
   its provider origin and is removed before the endpoint moves to another one.
 * Provider responses are size-limited and strictly validated. Review links
