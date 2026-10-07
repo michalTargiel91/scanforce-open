@@ -150,7 +150,13 @@ private class SfdcDcx_JobControllerTest {
       detail,
       'https://provider.example.com/r/1'
     );
-    System.assertEquals('https://provider.example.com/r/1', detail.reviewUrl);
+    System.assertEquals(
+      null,
+      detail.reviewUrl,
+      'Absolute links need a known provider origin'
+    );
+    System.assert(detail.reviewLinkBlocked);
+    System.assertEquals(null, detail.reviewPath, 'Never echoed as text');
     detail = new SfdcDcx_JobController.JobDetail();
     SfdcDcx_JobController.resolveReviewLink(detail, '/r/1');
     System.assertEquals(
@@ -162,6 +168,46 @@ private class SfdcDcx_JobControllerTest {
     detail = new SfdcDcx_JobController.JobDetail();
     SfdcDcx_JobController.resolveReviewLink(detail, null);
     System.assertEquals(null, detail.reviewPath);
+    System.assert(!detail.reviewLinkBlocked);
+  }
+
+  @IsTest
+  static void reviewLinksOpenOnlyOnTheProviderOrigin() {
+    SfdcDcx_Settings__c settings = SfdcDcx_Settings__c.getOrgDefaults();
+    settings.Provider_Origin__c = 'https://provider.example.com';
+    insert settings;
+    SfdcDcx_JobController.JobDetail detail = new SfdcDcx_JobController.JobDetail();
+    SfdcDcx_JobController.resolveReviewLink(
+      detail,
+      'https://provider.example.com/r/1'
+    );
+    System.assertEquals('https://provider.example.com/r/1', detail.reviewUrl);
+    System.assert(!detail.reviewLinkBlocked);
+    detail = new SfdcDcx_JobController.JobDetail();
+    SfdcDcx_JobController.resolveReviewLink(
+      detail,
+      'https://review.example.com/r/1'
+    );
+    System.assertEquals(null, detail.reviewUrl, 'Another origin never opens');
+    System.assert(detail.reviewLinkBlocked);
+    System.assertEquals(null, detail.reviewPath);
+    System.assertEquals(
+      null,
+      SfdcDcx_ResultReader.parse(
+          '{"jobId":"p1","status":"review_required","documentType":"invoice",' +
+          '"result":{},"warnings":[],"reviewUrl":"https://review.example.com/r/1"}'
+        )
+        .reviewUrl,
+      'Apex and Flow callers get the same policy'
+    );
+    System.assertEquals(
+      'https://provider.example.com/r/2',
+      SfdcDcx_ResultReader.parse(
+          '{"jobId":"p1","status":"review_required","documentType":"invoice",' +
+          '"result":{},"warnings":[],"reviewUrl":"/r/2"}'
+        )
+        .reviewUrl
+    );
   }
 
   @IsTest

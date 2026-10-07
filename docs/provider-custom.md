@@ -30,6 +30,13 @@ the review lifecycle precisely. The parts teams most often get wrong:
    content or OCR dump.
 4. **Review happens in your application.** Report `review_required`, then later
    the final state through the same endpoints.
+5. **Review links stay on your API origin.** Send `reviewUrl` as a path such as
+   `/review/<jobId>` or an `https://` URL on the same scheme, host and port as
+   the base URL configured in Salesforce. Salesforce never opens links to other
+   origins and rejects responses with `javascript:`, `data:`, `http:`, `//host`,
+   user information or other unsafe forms ([rules](provider-protocol.md#review-links)).
+   If your review UI lives on another host, serve a path on the API origin that
+   redirects signed-in users there.
 
 ## Start from the reference implementation
 

@@ -53,8 +53,9 @@ Salesforce user ──► ScanForce Open entry point ──► trusted processin
 | Stale workers overwriting newer state | Post-callout `FOR UPDATE` re-read, generation and identity comparison before every write. |
 | Oversized uploads exhausting heap | Size checked from metadata before the body is loaded; 5 MiB ceiling validated at runtime. |
 | Oversized or malicious responses | Bodies over 100 KiB rejected; strict JSON shape, job ID pattern and state validation; unknown states rejected; redirects rejected. Configure only trusted providers: a hostile provider can still waste a transaction's heap before checks. |
-| Provider output used as instructions | Results are rendered as data (text, numbers, tables), never as HTML or code. Review links are HTTPS or provider-relative paths only, opened in a new tab with `noopener`; Salesforce never fetches them. Absolute review links are shown as the provider sends them, which is another reason to connect only trusted providers. |
-| Credential leakage | Secrets only in the External Credential. In-app key entry writes through Salesforce's credential API, never returns or stores the key, and the field is masked and cleared. Changing the endpoint to a different host removes the stored credential (after a confirmation), so a key issued by one provider is never sent to another. No secrets in Apex, metadata, custom settings or source. |
+| Provider output used as instructions | Results are rendered as data (text, numbers, tables), never as HTML or code. |
+| Malicious or misleading review links | A provider's `reviewUrl` is untrusted browser-navigation input ([policy](provider-protocol.md#review-links)). Only a provider-relative path or an `https://` URL is accepted; other schemes (`javascript:`, `data:`, `http:`), protocol-relative `//host`, backslashes, user information, whitespace and over-long values reject the whole response (`INVALID_PROVIDER_RESPONSE`). Users, Flow and Apex callers are only ever offered links on the configured provider origin (scheme, host, port), opened in a new tab with `noopener noreferrer`; links to any other origin are stored as text on the job but never offered. Salesforce never fetches review links. |
+| Credential leakage | Secrets only in the External Credential. In-app key entry writes through Salesforce's credential API, never returns or stores the key, and the field is masked and cleared. A stored key belongs to its provider origin: moving the endpoint to another origin first removes the key (after a confirmation, in its own transaction), and the server refuses to change the endpoint while a key for the previous origin is stored, so a key issued by one provider is never sent to another. Verified at runtime: the new provider received no request carrying the previous credential. No secrets in Apex, metadata, custom settings or source. |
 | Public file exposure | No `ContentDistribution` (public link) is ever created; enforced by a static check. |
 | Mapping writes bypassing permissions | Field mappings read and update records in `USER_MODE`; only Completed results are applied; values are converted strictly per field type. |
 | Unauthorised configuration | Configuration requires **Administer ScanForce Open** plus Salesforce credential permissions; non-admins never see the tab. |
@@ -67,7 +68,7 @@ Salesforce user ──► ScanForce Open entry point ──► trusted processin
 | Salesforce Files | Your documents (unchanged) | Your Files policy. |
 | Processing job | IDs, file name, type hint, status, counters, compact result JSON, warnings, review link, error code | Until you delete the job. |
 | External Credential | Provider credential | Until rotated or removed by an administrator. |
-| Custom setting | Provider origin (scheme and host) | Refreshed from the Named Credential when an administrator saves the endpoint, opens Configuration, or runs the install script. |
+| Custom setting | Provider origin (scheme, host and port) | Refreshed from the Named Credential when an administrator opens Configuration (including after saving the endpoint) or runs the install script. |
 | Provider | Bytes and results per the provider's policy | See your provider's terms (for DocSolved.ai, its documentation and agreements). |
 
 No document content is written to logs by ScanForce Open code. Do not enable
@@ -87,7 +88,8 @@ verbose callout debug logging while processing sensitive documents.
 
 See [provider protocol](provider-protocol.md#10-data-handling-expectations):
 authenticate every request, durable idempotency, compact results, no logging of
-content or tokens, authenticated review links, documented retention.
+content or tokens, authenticated review links on the provider origin, documented
+retention.
 
 ## Reporting vulnerabilities
 

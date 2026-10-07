@@ -83,6 +83,8 @@ public with sharing class SfdcDcx_JobController {
     @AuraEnabled
     public String reviewPath;
     @AuraEnabled
+    public Boolean reviewLinkBlocked = false;
+    @AuraEnabled
     public FileInfo file;
     @AuraEnabled
     public SfdcDcx_RecordLabels.Label source;
@@ -296,25 +298,19 @@ public with sharing class SfdcDcx_JobController {
     return info;
   }
 
-  /** Provider-relative review paths resolve against the configured provider origin only. */
+  /** Only links on the configured provider origin are offered (see SfdcDcx_ReviewLink). */
   @TestVisible
   private static void resolveReviewLink(JobDetail detail, String reviewUrl) {
     if (String.isBlank(reviewUrl))
       return;
-    if (reviewUrl.startsWith('https://')) {
-      detail.reviewUrl = reviewUrl;
-      return;
-    }
-    detail.reviewPath = reviewUrl;
-    String origin = SfdcDcx_ProviderConnection.origin(
+    detail.reviewUrl = SfdcDcx_ReviewLink.resolve(
+      reviewUrl,
       SfdcDcx_Settings__c.getInstance().Provider_Origin__c
     );
-    if (
-      origin != null &&
-      reviewUrl.startsWith('/') &&
-      !reviewUrl.startsWith('//')
-    )
-      detail.reviewUrl = origin + reviewUrl;
+    detail.reviewLinkBlocked = detail.reviewUrl == null;
+    // Diagnostics echo provider-relative paths only, never another site's address.
+    if (SfdcDcx_ReviewLink.isRelative(reviewUrl))
+      detail.reviewPath = reviewUrl;
   }
 
   private static Actions actions(

@@ -3,6 +3,80 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## 1.0.0 — 2026-10-07
+
+First final release. It supersedes `1.0.0-rc.1`; there are no schema or
+protocol changes, and an RC installation upgrades by deploying this source.
+
+### Security
+
+* **Review links are untrusted input with an explicit policy**
+  ([protocol](docs/provider-protocol.md#review-links)). A provider may send a
+  provider-relative path or an `https://` URL; other schemes (`javascript:`,
+  `data:`, `http:`), `//host`, backslashes, user information, whitespace and
+  values over 255 characters reject the response (`INVALID_PROVIDER_RESPONSE`).
+  Users, Flow and Apex callers are only offered links on the configured
+  provider origin (scheme, host and port); links to other origins are stored
+  but never offered. Previously any absolute `https://` link was offered.
+* **Provider switch fixed and hardened.** Saving an endpoint on another provider
+  origin while a key was stored always failed at runtime: Salesforce does not
+  allow a credential change and a Named Credential change in one transaction.
+  The Configuration page now removes the key first and changes the endpoint
+  second, in two transactions, and the server refuses to move the endpoint
+  while a key for the previous origin is stored. The comparison is by origin
+  (scheme, host, port) instead of host, and a key whose previous origin cannot
+  be read is removed too.
+
+### Fixes
+
+* **Test connection** without a stored key reported *Provider unreachable*;
+  Salesforce actually sends nothing in that case. It now reports *No API key
+  stored*.
+
+### Documentation
+
+* Protocol, security, custom-provider and DocSolved.ai guides describe the
+  review-link policy and the origin-bound credential.
+* DocSolved.ai guide: the key is a workspace service key with only the
+  `connector` scope, and what that scope can and cannot do.
+* Testing guide: the release HTTPS smoke, provider-side checks, recovery and
+  minimum-permission steps.
+* Security and conduct contacts: GitHub private vulnerability reporting or
+  security@synairo.com (published in docsolved.ai's `security.txt`); conduct
+  reports to hello@synairo.com.
+
+### Validation
+
+* **Real end-to-end processing over HTTPS, no callout mocks.** The repository's
+  unmodified mock provider ran as a temporary public HTTPS service with an
+  evidence log (header facts and body digests, never the token). Salesforce
+  (API 67 scratch org) uploaded synthetic PDFs through the Workspace, and the
+  Queueable sent them through `SfdcDcx_Provider` / `SfdcDcx_ProviderAuth`. The
+  provider received the Bearer credential, `Content-Type: application/pdf`, the
+  exact bytes (MD5 and size equal to the ContentVersion), the job's
+  idempotency key, correlation ID, type hint, UTF-8 file name and
+  ContentVersion ID. Jobs polled through Processing to Completed with the
+  compact result stored in Salesforce. Also verified: Review Required →
+  provider approval → **Check review status** → Completed; a lost
+  acknowledgement retried with the same idempotency key (one provider job);
+  exactly 5 MiB accepted and 5 MiB + 1 rejected before any request; record-page
+  upload and field-mapping preview/apply; recovery of a job whose Queueable was
+  aborted; a minimum-permission user (Standard User + ScanForce Open User +
+  Provider Access) processing through the Flow action and seeing only their own
+  jobs; no `ContentDistribution`.
+* **Configuration UI** in Salesforce: provider choice, endpoint, key storage in
+  the External Credential, provider-access grant, *Test connection* against
+  `https://docsolved.ai/connect` (*Authentication failed*, as expected without
+  a DocSolved.ai key) and the mock (*No API key stored*, *Authentication
+  failed*, *Connected*). Switching from DocSolved.ai to the mock removed the
+  stored key first; the mock never received it (credential fingerprints in the
+  provider log).
+* **DocSolved.ai compatibility** against the deployed DocSolved.ai connector
+  code: a workspace key with only the `connector` scope, created through the
+  supported key endpoint, accepted the exact request Salesforce sent, and the
+  conformance checker passed.
+* Local lane, scratch gate and public CI: see the release notes.
+
 ## 1.0.0-rc.1 — 2026-10-07 (release candidate)
 
 First public release of ScanForce Open, the open-source successor to the

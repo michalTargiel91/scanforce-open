@@ -298,6 +298,15 @@
                   </dt>
                   <dd class="slds-item_detail">{job.reviewPath}</dd>
                 </template>
+                <template lwc:if={job.reviewLinkBlocked}>
+                  <dt class="slds-item_label slds-text-color_weak">
+                    Review link
+                  </dt>
+                  <dd class="slds-item_detail sfo-review-blocked">
+                    Not offered: only links on the configured provider's site
+                    open from Salesforce.
+                  </dd>
+                </template>
               </dl>
             </template>
           </div>

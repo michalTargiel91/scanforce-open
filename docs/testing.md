@@ -54,32 +54,58 @@ outcomes through `HttpCalloutMock`. Callouts in Apex tests are always mocked.
 ## 3. Runtime smoke with a real HTTPS provider
 
 Mocked callouts cannot prove credential injection, TLS or networking. Before a
-release, run a smoke test against a real HTTPS provider in a fresh scratch org
-with **synthetic documents only**:
+release, run a smoke test against a real HTTPS provider in a scratch org with
+**synthetic documents only**:
 
-1. `DEV_HUB_ALIAS=my-hub KEEP_SCRATCH=1 bash scripts/validate-scratch.sh`
-2. Provide an HTTPS endpoint: the mock provider behind an HTTPS reverse proxy you
-   control, a staging instance of your provider, or a DocSolved.ai test
-   workspace. Never expose the mock with real documents.
-3. In **Configuration**: set the endpoint, store the test key, grant access,
-   install recovery, **Test connection** → *Connected*. A wrong key first must
-   show *Authentication failed*.
+1. `DEV_HUB_ALIAS=my-hub KEEP_SCRATCH=1 bash scripts/validate-scratch.sh`, or
+   install into a scratch org with `scripts/install.sh`.
+2. Provide an HTTPS endpoint: the mock provider behind an HTTPS reverse proxy or
+   a short-lived hosted container you control (bind `0.0.0.0` there; the token
+   comes from the platform's secret store), a staging instance of your
+   provider, or a DocSolved.ai test workspace. Never expose the mock with real
+   documents, and delete it afterwards.
+3. In **Configuration**: set the endpoint, grant access, install recovery.
+   **Test connection** without a key shows *No API key stored* (nothing is
+   sent); a wrong key shows *Authentication failed*; the right key shows
+   *Connected*. Switching the endpoint to another origin while a key is stored
+   asks for confirmation and removes the key before the endpoint changes; the
+   new provider must never receive the previous key.
 4. Generate boundary files: `python3 scripts/make-smoke-pdfs.py /tmp/sfo-smoke`
    (1 KiB, ~4.9 MiB, 5 MiB − 1, exactly 5 MiB, 5 MiB + 1).
 5. Upload them in the Workspace. Expected: all ≤ 5 MiB complete (mock type
    `auto` or `invoice`); 5 MiB + 1 is rejected with *File is too large* and no
    request reaches the provider.
-6. Mock types exercise the rest: `review` (Review Required → approve on the mock
-   review page with HTTP basic auth using the mock token → **Check review
-   status** → Completed), `lost_response` (one provider job despite a lost
-   acknowledgement), `fail`, `cancel`, `slow` (Timed Out after 60 minutes),
-   `oversized` (`RESULT_TOO_LARGE`), `rate_limit`, `malformed`.
-7. Apply field mappings from a Completed invoice linked to an Opportunity.
-8. Record job IDs, provider IDs, statuses and byte counts; never record tokens.
+6. On the provider side, check one submit: `Authorization` present and
+   accepted, `Content-Type` exactly the file type, body size and digest equal to
+   the ContentVersion's `ContentSize` and `Checksum` (MD5), and the
+   `Idempotency-Key`, `X-Correlation-Id`, `X-Document-Type`, `X-File-Name` and
+   `X-Source-Id` headers of the job.
+7. Mock types exercise the rest: `review` (Review Required → *Open review in
+   provider* must point to the provider origin → approve on the mock review page
+   with HTTP basic auth using the mock token → **Check review status** →
+   Completed), `lost_response` (one provider job despite a lost
+   acknowledgement: the retry carries the same idempotency key), `fail`,
+   `cancel`, `slow` (Timed Out after 60 minutes), `oversized`
+   (`RESULT_TOO_LARGE`), `rate_limit`, `malformed`.
+8. Apply field mappings from a Completed invoice processed from a record page
+   (Record Documents component) of an Opportunity.
+9. Recovery: abort the pending `SfdcDcx_ProcessingQueueable` of an active job;
+   the next five-minute recovery schedule resumes it.
+10. Minimum permissions: repeat a submission as a user who has only the
+    *Standard User* profile, **ScanForce Open User** and **ScanForce Open
+    Provider Access** (for example through the Flow action REST endpoint
+    `/services/data/v67.0/actions/custom/apex/SfdcDcx_Submit`); that user sees
+    only their own jobs.
+11. Confirm no `ContentDistribution` exists. Record job IDs, provider IDs,
+    statuses and byte counts; never record tokens.
+
+Tip: after redeploying components, Lightning may keep serving the previous
+bundle from the browser cache. Enable debug mode for the test user or clear the
+site data before checking UI changes.
 
 ## Release checklist
 
 - [ ] Local lane green, including code analyzer and secret scan.
 - [ ] Scratch gate green on API 67 with coverage ≥ 75 %.
-- [ ] HTTPS smoke completed (or the gap is stated in the release notes).
+- [ ] HTTPS smoke completed against a real provider (required for a final release; a pre-release must state the gap).
 - [ ] Docs match behaviour; CHANGELOG updated; version bumped in `package.json` and `sfdx-project.json`.

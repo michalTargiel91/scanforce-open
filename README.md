@@ -97,7 +97,7 @@ key. Full details and a manual path: [docs/install.md](docs/install.md).
 
 | | DocSolved.ai | Your own provider |
 |---|---|---|
-| What you need | A DocSolved.ai API key with the `connector` scope | An HTTPS service implementing [`/connect/v1`](docs/provider-protocol.md) |
+| What you need | A DocSolved.ai workspace key with only the `connector` scope | An HTTPS service implementing [`/connect/v1`](docs/provider-protocol.md) |
 | Endpoint | `https://docsolved.ai/connect` | `https://your-host/connect` |
 | Authentication | Bearer API key, stored in the External Credential | Bearer key, custom header, OAuth client credentials or mTLS via the External Credential |
 | Guide | [docs/provider-docsolved.md](docs/provider-docsolved.md) | [docs/provider-custom.md](docs/provider-custom.md) |
@@ -128,7 +128,11 @@ is a configuration change.
   change status and results.
 * Secrets live only in Salesforce External Credentials. No Connected App, OAuth
   registration, callbacks, Remote Site Settings or public file links.
-* Strict validation of provider responses (shape, size, state, IDs, review links).
+* Strict validation of provider responses (shape, size, state, IDs). Review
+  links are untrusted: only HTTPS or provider-relative links are accepted, and
+  only links on the configured provider origin are ever offered to users.
+* A stored API key belongs to its provider origin: pointing ScanForce Open at
+  another provider removes the key first, so it is never sent elsewhere.
 
 Read [docs/security.md](docs/security.md) and report vulnerabilities as described
 in [SECURITY.md](SECURITY.md).

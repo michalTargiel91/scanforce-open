@@ -36,11 +36,19 @@ shows readiness:
 1. **Provider**: DocSolved.ai or Custom provider (presentation only; both use the
    same protocol).
 2. **Endpoint**: updates the Named Credential URL. HTTPS, no credentials, query
-   string or fragment; normally ending in `/connect`. Switching to a different
-   host removes the stored credential after you confirm, so the previous
-   provider's key is never sent to the new one; store the new key next. Jobs still
-   in progress with the previous provider fail or time out, so let them finish
-   first.
+   string or fragment; normally ending in `/connect`. A stored key belongs to the
+   provider **origin** it was issued for (scheme, host and port; host case and
+   the default port 443 do not matter, the path does not count). Saving an
+   endpoint on another origin asks for confirmation, then removes the stored key
+   first and changes the Named Credential second, in two separate Salesforce
+   transactions (Salesforce does not allow both in one). The server refuses to
+   move the endpoint while a key for the previous origin is still stored, so the
+   previous provider's key is never sent to the new one, even if the second step
+   fails. Store the new key next. Jobs still in progress with the previous
+   provider fail or time out, so let them finish first. Only the install
+   placeholder (`*.invalid`) keeps a key entered before the first real endpoint.
+   Changing the URL directly in Setup bypasses this protection: remove the
+   credential yourself when you do that.
 3. **API key**: writes the `Token` parameter of the `Provider` principal of the
    External Credential through Salesforce's credential API. The key is never
    returned, displayed or stored anywhere else. (If an Apex debug trace at
@@ -52,7 +60,9 @@ shows readiness:
    Open users who lack it, up to 200 users per click.
 5. **Recovery**: installs the five-minute recovery schedule.
 6. **Test connection**: one authenticated GET for a job that cannot exist. No
-   document is sent.
+   document is sent. *No API key stored* means Salesforce sent nothing because
+   the External Credential has no key; *Authentication failed* means the
+   provider rejected the key.
 
 ### In Setup (equivalent, and required for non-Bearer schemes)
 
@@ -120,10 +130,12 @@ mappings.
 ## Settings
 
 `SfdcDcx_Settings__c` (hierarchy custom setting) has one non-secret field,
-**Provider Origin**, used to open provider-relative review links on the
-provider's domain. It is refreshed when an administrator saves the endpoint or
-opens the Configuration page, and by the install script. If you change the
-Named Credential in Setup, open Configuration once. You never need to edit it.
+**Provider Origin**, the origin against which review links are checked: only
+links on this origin are offered to users (see
+[review links](provider-protocol.md#review-links)). It is refreshed when an
+administrator opens the Configuration page (including right after saving the
+endpoint) and by the install script. If you change the Named Credential in
+Setup, open Configuration once. You never need to edit it.
 
 ## Data visibility
 

@@ -7,12 +7,18 @@ private class SfdcDcx_SetupControllerTest {
     String updatedUrl;
     Boolean failWrites = false;
     Boolean cleared = false;
+    // Salesforce rejects a Named Credential update in the transaction that changed
+    // a stored credential (mixed setup DML). Tests mark transaction boundaries.
+    Boolean credentialChangedInTransaction = false;
 
+    void endTransaction() {
+      credentialChangedInTransaction = false;
+    }
     public SfdcDcx_ProviderConnection.State read() {
       return state;
     }
     public void updateEndpoint(String url) {
-      if (failWrites)
+      if (failWrites || credentialChangedInTransaction)
         throw new SfdcDcx_ProviderConnection.ConnectionException('denied');
       updatedUrl = url;
       state.endpointUrl = url;
@@ -26,6 +32,7 @@ private class SfdcDcx_SetupControllerTest {
     }
     public void clearToken() {
       cleared = true;
+      credentialChangedInTransaction = true;
       state.parameterNames = new List<String>();
     }
   }
@@ -116,6 +123,14 @@ private class SfdcDcx_SetupControllerTest {
       } catch (AuraHandledException expected) {
         System.assert(expected.getMessage().contains('Administrator'));
       }
+      try {
+        SfdcDcx_SetupController.removeCredentialForEndpoint(
+          'https://provider.example.com/connect'
+        );
+        System.assert(false, 'Removing credentials requires the administrator');
+      } catch (AuraHandledException expected) {
+        System.assert(expected.getMessage().contains('Administrator'));
+      }
     }
   }
 
@@ -182,9 +197,24 @@ private class SfdcDcx_SetupControllerTest {
     FakeBackend backend = configuredBackend('https://docsolved.ai/connect');
     backend.state.parameterNames = new List<String>{ 'Token' };
     System.runAs(SfdcDcx_TestFactory.userByAlias('sfoadm')) {
+      SfdcDcx_SetupController.removeCredentialForEndpoint(
+        'https://docsolved.ai/connect/'
+      );
+      System.assert(!backend.cleared, 'Same origin keeps the credential');
       SfdcDcx_SetupController.saveEndpoint('https://docsolved.ai/connect/');
-      System.assert(!backend.cleared, 'Same host keeps the credential');
-      SfdcDcx_SetupController.SetupStatus status = SfdcDcx_SetupController.saveEndpoint(
+      try {
+        SfdcDcx_SetupController.saveEndpoint(
+          'https://provider.example.com/connect'
+        );
+        System.assert(
+          false,
+          'Never moves the endpoint while the key is stored'
+        );
+      } catch (AuraHandledException expected) {
+        System.assert(expected.getMessage().contains('Remove it before'));
+      }
+      System.assertEquals('https://docsolved.ai/connect', backend.updatedUrl);
+      SfdcDcx_SetupController.SetupStatus status = SfdcDcx_SetupController.removeCredentialForEndpoint(
         'https://provider.example.com/connect'
       );
       System.assert(
@@ -193,8 +223,78 @@ private class SfdcDcx_SetupControllerTest {
       );
       System.assert(!status.credential.configured);
       System.assertEquals(
+        'https://docsolved.ai/connect',
+        backend.updatedUrl,
+        'The endpoint moves only in the next transaction'
+      );
+      backend.endTransaction();
+      SfdcDcx_SetupController.saveEndpoint(
+        'https://provider.example.com/connect'
+      );
+      System.assertEquals(
         'https://provider.example.com/connect',
         backend.updatedUrl
+      );
+    }
+  }
+
+  @IsTest
+  static void credentialChangeAndEndpointNeverShareATransaction() {
+    FakeBackend backend = configuredBackend('https://docsolved.ai/connect');
+    backend.state.parameterNames = new List<String>{ 'Token' };
+    System.runAs(SfdcDcx_TestFactory.userByAlias('sfoadm')) {
+      SfdcDcx_SetupController.removeCredentialForEndpoint(
+        'https://provider.example.com/connect'
+      );
+      try {
+        SfdcDcx_SetupController.saveEndpoint(
+          'https://provider.example.com/connect'
+        );
+        System.assert(false, 'The platform rejects this in one transaction');
+      } catch (AuraHandledException expected) {
+        System.assert(
+          expected.getMessage().contains('did not accept the endpoint change')
+        );
+      }
+      System.assert(backend.cleared, 'Key removed even when the move fails');
+    }
+  }
+
+  @IsTest
+  static void credentialFollowsTheProviderOrigin() {
+    FakeBackend backend = configuredBackend(
+      'https://provider.example.com/connect'
+    );
+    backend.state.parameterNames = new List<String>{ 'Token' };
+    System.runAs(SfdcDcx_TestFactory.userByAlias('sfoadm')) {
+      SfdcDcx_SetupController.removeCredentialForEndpoint(
+        'https://PROVIDER.example.com:443/v2/connect'
+      );
+      System.assert(
+        !backend.cleared,
+        'Host case, default port and path keep the origin'
+      );
+      SfdcDcx_SetupController.saveEndpoint(
+        'https://PROVIDER.example.com:443/v2/connect'
+      );
+      SfdcDcx_SetupController.removeCredentialForEndpoint(
+        'https://provider.example.com:8443/connect'
+      );
+      System.assert(backend.cleared, 'Another port is another origin');
+    }
+  }
+
+  @IsTest
+  static void unreadablePreviousEndpointRemovesTheKey() {
+    FakeBackend backend = configuredBackend('http://provider.example.com');
+    backend.state.parameterNames = new List<String>{ 'Token' };
+    System.runAs(SfdcDcx_TestFactory.userByAlias('sfoadm')) {
+      SfdcDcx_SetupController.removeCredentialForEndpoint(
+        'https://provider.example.com/connect'
+      );
+      System.assert(
+        backend.cleared,
+        'A key whose provider origin cannot be confirmed is not carried over'
       );
     }
   }
@@ -204,8 +304,12 @@ private class SfdcDcx_SetupControllerTest {
     FakeBackend backend = configuredBackend('https://example.invalid/connect');
     backend.state.parameterNames = new List<String>{ 'Token' };
     System.runAs(SfdcDcx_TestFactory.userByAlias('sfoadm')) {
+      SfdcDcx_SetupController.removeCredentialForEndpoint(
+        'https://docsolved.ai/connect'
+      );
       SfdcDcx_SetupController.saveEndpoint('https://docsolved.ai/connect');
       System.assert(!backend.cleared);
+      System.assertEquals('https://docsolved.ai/connect', backend.updatedUrl);
     }
   }
 
@@ -282,6 +386,12 @@ private class SfdcDcx_SetupControllerTest {
         } catch (AuraHandledException expected) {
           System.assert(expected.getMessage().contains('HTTPS'));
         }
+      try {
+        SfdcDcx_SetupController.removeCredentialForEndpoint('javascript:x');
+        System.assert(false, 'Accepted unsafe endpoint');
+      } catch (AuraHandledException expected) {
+        System.assert(!backend.cleared);
+      }
       for (
         String bad : new List<String>{
           'short',
@@ -410,6 +520,16 @@ private class SfdcDcx_SetupControllerTest {
         probe(new FailingMock('We couldn\'t access the credential(s).')).outcome
       );
       System.assertEquals(
+        'NO_CREDENTIAL',
+        probe(
+            new FailingMock(
+              'Field SfdcDcx_ProviderAuth.Token does not exist. Check spelling.'
+            )
+          )
+          .outcome,
+        'Observed in Salesforce when no key is stored: nothing is sent'
+      );
+      System.assertEquals(
         'UNREACHABLE',
         probe(new FailingMock('Read timed out')).outcome
       );
@@ -419,6 +539,15 @@ private class SfdcDcx_SetupControllerTest {
 
   @IsTest
   static void endpointHelpersAreStrict() {
+    // String.equals is case-sensitive, unlike Apex ==.
+    System.assert(
+      SfdcDcx_ProviderConnection.origin('https://A.Example.com:443/connect')
+        .equals('https://a.example.com')
+    );
+    System.assert(
+      SfdcDcx_ProviderConnection.origin('https://a.example.com:8443/connect')
+        .equals('https://a.example.com:8443')
+    );
     System.assertEquals(
       'https://a.example.com/connect',
       SfdcDcx_ProviderConnection.normalizeEndpoint(

@@ -84,8 +84,12 @@ public with sharing class SfdcDcx_ResultReader {
     envelope.providerStatus = root.get('status') instanceof String
       ? (String) root.get('status')
       : null;
+    // Callers only ever receive a link on the configured provider origin.
     envelope.reviewUrl = root.get('reviewUrl') instanceof String
-      ? (String) root.get('reviewUrl')
+      ? SfdcDcx_ReviewLink.resolve(
+          (String) root.get('reviewUrl'),
+          SfdcDcx_Settings__c.getInstance().Provider_Origin__c
+        )
       : null;
     if (root.get('warnings') instanceof List<Object>)
       for (Object warning : (List<Object>) root.get('warnings'))

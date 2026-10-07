@@ -10,18 +10,25 @@ What DocSolved.ai adds is the hosted part: OCR and extraction quality,
 automatic document classification, a maintained processing pipeline, human
 review screens, operations, security, support and service levels.
 
-## 1. Get a DocSolved.ai API key
+## 1. Get a DocSolved.ai connector key
 
-1. Sign in at [docsolved.ai](https://docsolved.ai).
-2. Create an API key with the **`connector`** scope. For organisations, create
-   the key as a **workspace** key (owned by the workspace rather than a person)
-   so Salesforce keeps working when the administrator who created it leaves.
-3. Copy the key once; DocSolved.ai shows it only at creation. Do not paste it
-   into chat, tickets, source control or Salesforce fields other than the step
-   below.
+ScanForce Open authenticates to DocSolved.ai with a **workspace service key**
+(`sk_docai_…`) that carries **only the `connector` scope**:
 
-If the key form in your account does not offer the `connector` scope, contact
-DocSolved.ai support to enable it for your workspace.
+* it belongs to your DocSolved.ai workspace, not to a person, so Salesforce
+  keeps working when the administrator who created it leaves, and rotating it
+  keeps the same workspace identity (in-flight retries still find their jobs);
+* the `connector` scope opens the `/connect/v1` endpoints and nothing else: the
+  key cannot browse your DocSolved.ai history, manage webhooks, call other APIs
+  or act as a user or administrator;
+* results of jobs submitted from Salesforce land in that workspace, where its
+  review and approval policy applies.
+
+A workspace owner or administrator creates the key. If the API key form in
+your account does not offer the `connector` scope or a workspace, contact
+DocSolved.ai support, which issues the key for your workspace. Copy the key
+once; DocSolved.ai shows it only at creation. Do not paste it into chat,
+tickets, source control or Salesforce fields other than the step below.
 
 ## 2. Configure Salesforce
 
@@ -68,8 +75,9 @@ Prefer Setup over the Configuration page? Follow
   is returned as `documentType` (for example `invoice`), which field mappings
   can match. Other hints are recorded with the job and are part of its
   idempotency identity.
-* **Review links** are relative paths resolved against `https://docsolved.ai`
-  and require a normal DocSolved.ai sign-in.
+* **Review links** are provider-relative paths (`/analyze?record=…`) opened on
+  `https://docsolved.ai`, the configured provider origin, and require a normal
+  DocSolved.ai sign-in.
 * **Idempotency.** Retries with the same key return the original job and are not
   charged again. Workspace keys keep the same identity across key rotation.
 * **Usage and quotas** follow your DocSolved.ai plan. A used-up quota appears in
@@ -91,7 +99,7 @@ Prefer Setup over the Configuration page? Follow
 ## Leaving DocSolved.ai
 
 Point the Named Credential at another compatible provider and store its
-credential. Saving a different host on the Configuration page removes the stored
-DocSolved.ai key so it is never sent to the new provider. Let in-flight jobs
+credential. Saving an endpoint on another origin on the Configuration page first
+removes the stored DocSolved.ai key, so it is never sent to the new provider. Let in-flight jobs
 finish first: a different provider cannot answer for jobs DocSolved.ai created. Completed results already in Salesforce stay on
 their job records.

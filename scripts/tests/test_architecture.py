@@ -119,10 +119,18 @@ class ArchitectureContractTest(unittest.TestCase):
 
     def test_setup_writes_do_not_share_a_transaction_with_settings_dml(self):
         setup = self.read("SfdcDcx_SetupController.cls")
-        for method in ("saveEndpoint", "saveApiKey", "installRecovery"):
+        for method in ("saveEndpoint", "removeCredentialForEndpoint", "saveApiKey", "installRecovery"):
             body = method_body(setup, f"public static SetupStatus {method}(")
             self.assertIn("return buildStatus();", body, method)
             self.assertNotRegex(body, r"getStatus\(\)\s*;", method)
+
+    def test_credential_and_named_credential_changes_never_share_a_transaction(self):
+        """Salesforce rejects both in one transaction (mixed setup DML), seen at runtime."""
+        setup = self.read("SfdcDcx_SetupController.cls")
+        for method in ("saveEndpoint", "removeCredentialForEndpoint", "saveApiKey"):
+            body = method_body(setup, f"public static SetupStatus {method}(")
+            writes = [name for name in ("updateEndpoint(", "clearToken(", "storeToken(") if name in body]
+            self.assertLessEqual(len(writes), 1, (method, writes))
 
     def test_all_apex_metadata_is_api_67(self):
         for path in CLASSES.glob("*.cls-meta.xml"):

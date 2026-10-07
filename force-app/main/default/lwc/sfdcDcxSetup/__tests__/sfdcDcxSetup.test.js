@@ -2,6 +2,7 @@ import { createElement } from "lwc";
 import SfdcDcxSetup from "c/sfdcDcxSetup";
 import getStatus from "@salesforce/apex/SfdcDcx_SetupController.getStatus";
 import saveEndpoint from "@salesforce/apex/SfdcDcx_SetupController.saveEndpoint";
+import removeCredentialForEndpoint from "@salesforce/apex/SfdcDcx_SetupController.removeCredentialForEndpoint";
 import saveApiKey from "@salesforce/apex/SfdcDcx_SetupController.saveApiKey";
 import testConnection from "@salesforce/apex/SfdcDcx_SetupController.testConnection";
 import installRecovery from "@salesforce/apex/SfdcDcx_SetupController.installRecovery";
@@ -20,6 +21,11 @@ jest.mock(
 );
 jest.mock(
   "@salesforce/apex/SfdcDcx_SetupController.saveEndpoint",
+  () => ({ default: jest.fn() }),
+  { virtual: true },
+);
+jest.mock(
+  "@salesforce/apex/SfdcDcx_SetupController.removeCredentialForEndpoint",
   () => ({ default: jest.fn() }),
   { virtual: true },
 );
@@ -300,12 +306,78 @@ describe("c-sfdc-dcx-setup", () => {
     );
     expect(saveEndpoint).not.toHaveBeenCalled();
 
+    expect(removeCredentialForEndpoint).not.toHaveBeenCalled();
+
     LightningConfirm.open.mockResolvedValue(true);
-    saveEndpoint.mockResolvedValue(docsolved);
+    const order = [];
+    removeCredentialForEndpoint.mockImplementation(async () => {
+      order.push("remove");
+      return docsolved;
+    });
+    saveEndpoint.mockImplementation(async () => {
+      order.push("save");
+      return docsolved;
+    });
     byLabel(element, "Save endpoint").click();
     await settle();
+    await settle();
+    // Two server calls: Salesforce rejects both credential changes in one transaction.
+    expect(order).toEqual(["remove", "save"]);
+    expect(removeCredentialForEndpoint).toHaveBeenCalledWith({
+      url: "https://provider.example.com/connect",
+    });
     expect(saveEndpoint).toHaveBeenCalledWith({
       url: "https://provider.example.com/connect",
     });
+  });
+
+  it("treats a port change as a new provider origin but not a path change", async () => {
+    const custom = status({
+      providerKind: "custom",
+      endpoint: {
+        exists: true,
+        url: "https://provider.example.com/connect",
+        host: "provider.example.com",
+        https: true,
+        placeholder: false,
+        endsWithConnect: true,
+        ready: true,
+      },
+      credential: {
+        exists: true,
+        protocol: "Custom",
+        principalExists: true,
+        parameterNames: ["Token"],
+        configured: true,
+        supportsInAppKey: true,
+      },
+    });
+    getStatus.mockResolvedValue(custom);
+    saveEndpoint.mockResolvedValue(custom);
+    LightningConfirm.open.mockResolvedValue(false);
+    const element = mount();
+    await settle();
+    element.shadowRoot.querySelector('button[data-kind="custom"]').click();
+    await settle();
+    const enter = async (value) => {
+      element.shadowRoot
+        .querySelector("lightning-input.sfo-endpoint-input")
+        .dispatchEvent(new CustomEvent("change", { detail: { value } }));
+      await settle();
+      byLabel(element, "Save endpoint").click();
+      await settle();
+    };
+
+    await enter("https://PROVIDER.example.com:443/v2/connect");
+    expect(LightningConfirm.open).not.toHaveBeenCalled();
+    expect(removeCredentialForEndpoint).not.toHaveBeenCalled();
+    expect(saveEndpoint).toHaveBeenCalledTimes(1);
+
+    await enter("https://provider.example.com:8443/connect");
+    expect(LightningConfirm.open).toHaveBeenCalledTimes(1);
+    expect(LightningConfirm.open.mock.calls[0][0].message).toContain(
+      "never sent to https://provider.example.com:8443",
+    );
+    expect(saveEndpoint).toHaveBeenCalledTimes(1);
   });
 });

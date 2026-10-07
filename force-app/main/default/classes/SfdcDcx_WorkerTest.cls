@@ -345,7 +345,8 @@ private class SfdcDcx_WorkerTest {
         Next_Attempt_At__c,
         Completed_At__c,
         Submission_Key__c,
-        Dedup_Hash__c
+        Dedup_Hash__c,
+        Review_URL__c
       FROM SfdcDcx_Processing_Job__c
       WHERE Id = :id
       WITH SYSTEM_MODE
@@ -1121,6 +1122,30 @@ private class SfdcDcx_WorkerTest {
       Test.setMock(HttpCalloutMock.class, mock);
       processJob(id, 0);
       System.assertEquals('INVALID_PROVIDER_RESPONSE', read(id).Error_Code__c);
+    }
+  }
+  @IsTest
+  static void credentialBearingReviewUrlIsRejected() {
+    System.runAs(connectorUser()) {
+      Id id = job();
+      Provider mock = new Provider('completed');
+      mock.reviewUrl = 'https://user:secret@provider.example.com/review/1';
+      Test.setMock(HttpCalloutMock.class, mock);
+      processJob(id, 0);
+      System.assertEquals('INVALID_PROVIDER_RESPONSE', read(id).Error_Code__c);
+    }
+  }
+  @IsTest
+  static void providerRelativeReviewQueryIsStored() {
+    System.runAs(connectorUser()) {
+      Id id = job();
+      Provider mock = new Provider('review_required');
+      mock.reviewUrl = '/analyze?record=0f4c-11';
+      Test.setMock(HttpCalloutMock.class, mock);
+      processJob(id, 0);
+      SfdcDcx_Processing_Job__c stored = read(id);
+      System.assertEquals('Review Required', stored.Status__c);
+      System.assertEquals('/analyze?record=0f4c-11', stored.Review_URL__c);
     }
   }
 

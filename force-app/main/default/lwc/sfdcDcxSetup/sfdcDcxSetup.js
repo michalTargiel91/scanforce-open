@@ -4,6 +4,7 @@ import { ShowToastEvent } from "lightning/platformShowToastEvent";
 import LightningConfirm from "lightning/confirm";
 import getStatus from "@salesforce/apex/SfdcDcx_SetupController.getStatus";
 import saveEndpoint from "@salesforce/apex/SfdcDcx_SetupController.saveEndpoint";
+import removeCredentialForEndpoint from "@salesforce/apex/SfdcDcx_SetupController.removeCredentialForEndpoint";
 import saveApiKey from "@salesforce/apex/SfdcDcx_SetupController.saveApiKey";
 import testConnection from "@salesforce/apex/SfdcDcx_SetupController.testConnection";
 import installRecovery from "@salesforce/apex/SfdcDcx_SetupController.installRecovery";
@@ -216,45 +217,58 @@ export default class SfdcDcxSetup extends NavigationMixin(LightningElement) {
     this.endpointInput = event.detail.value;
   }
 
-  /** Host of an endpoint URL, or null. */
-  hostOf(value) {
+  /** Origin (scheme, host, port) of an endpoint URL, or null. */
+  originOf(value) {
     try {
-      return new URL(value).hostname.toLowerCase();
+      return new URL(value).origin.toLowerCase();
     } catch {
       return null;
     }
   }
 
-  /** A stored key belongs to its provider: confirm before it is removed by a host change. */
-  async confirmProviderSwitch() {
+  /**
+   * A stored key belongs to its provider origin (same rule as
+   * SfdcDcx_SetupController): a new origin means the key has to go first.
+   */
+  get providerSwitch() {
     const endpoint = this.status.endpoint;
-    const nextHost = this.hostOf(this.endpointInput);
-    const switching =
-      endpoint.ready &&
-      endpoint.host &&
-      nextHost &&
-      nextHost !== endpoint.host &&
-      this.status.credential.configured;
-    if (!switching) {
-      return true;
-    }
+    const current = this.originOf(endpoint.url);
+    const next = this.originOf(this.endpointInput);
+    return this.status.credential.configured &&
+      !endpoint.placeholder &&
+      next &&
+      next !== current
+      ? { previous: current || "the current endpoint", next }
+      : null;
+  }
+
+  confirmProviderSwitch({ previous, next }) {
     const active = countsByFilter(this.status.activity.statusCounts).active;
     const inFlight = active
-      ? ` ${active} job(s) still in progress with ${endpoint.host} will fail or time out; let them finish first if you can.`
+      ? ` ${active} job(s) still in progress with ${previous} will fail or time out; let them finish first if you can.`
       : "";
     return LightningConfirm.open({
       label: "Switch document provider?",
-      message: `The stored API key was issued for ${endpoint.host}. Saving removes it so it is never sent to ${nextHost}; store the new provider's key in step 3.${inFlight}`,
+      message: `The stored API key was issued for ${previous}. Saving removes it so it is never sent to ${next}; store the new provider's key in step 3.${inFlight}`,
       theme: "warning",
     });
   }
 
   async saveEndpoint() {
-    if (!(await this.confirmProviderSwitch())) {
+    const switching = this.providerSwitch;
+    if (switching && !(await this.confirmProviderSwitch(switching))) {
       return;
     }
+    const url = this.endpointInput;
     await this.run(async () => {
-      await saveEndpoint({ url: this.endpointInput });
+      if (switching) {
+        // Its own transaction, first: Salesforce rejects a credential change and a
+        // Named Credential change together, and the key must be gone before the
+        // endpoint moves. The page shows the removal even if the next step fails.
+        this.applyStatus(await removeCredentialForEndpoint({ url }));
+        this.connection = undefined;
+      }
+      await saveEndpoint({ url });
       this.applyStatus(await getStatus());
       this.connection = undefined;
       this.toast(

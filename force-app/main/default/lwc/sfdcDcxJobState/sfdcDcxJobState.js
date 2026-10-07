@@ -356,6 +356,12 @@ const CONNECTION = {
     detail:
       "The provider rejected the API key. Save the correct key and test again.",
   },
+  NO_CREDENTIAL: {
+    tone: "error",
+    title: "No API key stored",
+    detail:
+      "Salesforce sent nothing because the External Credential has no stored key. Store the provider's API key in step 3 and test again.",
+  },
   NO_CREDENTIAL_ACCESS: {
     tone: "error",
     title: "No access to the provider credential",

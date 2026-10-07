@@ -176,6 +176,26 @@ describe("c-sfdc-dcx-job-detail", () => {
     expect(element.shadowRoot.textContent).toContain("Checking the provider");
   });
 
+  it("offers no review link when the server blocked an off-origin link", async () => {
+    getJob.mockResolvedValue({
+      ...BASE,
+      status: "Review Required",
+      result: RESULT,
+      reviewUrl: null,
+      reviewLinkBlocked: true,
+      actions: { ...BASE.actions, canRefresh: true },
+    });
+    const element = mount();
+    await settle();
+    expect(element.shadowRoot.querySelector('a[target="_blank"]')).toBeNull();
+    expect(button(element, "Check review status")).toBeTruthy();
+    element.shadowRoot.querySelector("button[aria-expanded]").click();
+    await settle();
+    expect(
+      element.shadowRoot.querySelector(".sfo-review-blocked").textContent,
+    ).toContain("only links on the configured provider's site");
+  });
+
   it("explains failures and retries into a new job", async () => {
     getJob.mockResolvedValue({
       ...BASE,

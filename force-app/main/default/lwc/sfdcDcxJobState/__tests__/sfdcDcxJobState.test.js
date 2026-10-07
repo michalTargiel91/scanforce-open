@@ -103,6 +103,7 @@ describe("c-sfdc-dcx-job-state", () => {
     expect(connectionInfo("NO_CREDENTIAL_ACCESS").detail).toMatch(
       /Provider Access/,
     );
+    expect(connectionInfo("NO_CREDENTIAL").title).toBe("No API key stored");
     expect(connectionInfo("ODD").title).toBe("Connection test failed");
     expect(mappingStatusInfo("READY").tone).toBe("success");
     expect(mappingStatusInfo("OTHER").label).toBe("OTHER");

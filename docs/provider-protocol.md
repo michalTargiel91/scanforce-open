@@ -126,7 +126,7 @@ Accept: application/json
 | `documentType` | yes | String. The provider's classification, for example `invoice`; may differ from the hint. |
 | `result` | yes | JSON object with the extracted business data. Nested objects and arrays of objects are fine: Salesforce shows nested keys as fields and arrays of objects as tables. |
 | `warnings` | yes | Array (may be empty) of short strings such as `LOW_CONFIDENCE:supplier.taxId`. |
-| `reviewUrl` | no | `null`, an absolute `https://` URL, or a provider-relative path starting with a single `/`, at most 255 characters, no line breaks. It MUST require normal provider authentication and MUST NOT be a public link to the source document. Salesforce never fetches it; it only shows a link that opens in a new tab. Relative paths are resolved against the provider origin of the Named Credential. |
+| `reviewUrl` | no | `null`, a provider-relative path, or an absolute `https://` URL on the provider origin. See [review links](#review-links). |
 
 Keep results compact. The whole response MUST NOT exceed 102,400 bytes and
 MUST NOT contain the source file, page images, base64, full OCR text dumps,
@@ -135,6 +135,42 @@ larger, reply **413** with code `RESULT_TOO_LARGE` and keep the full result in
 your own system; never truncate JSON.
 
 Before a result exists, reply **409** with code `RESULT_NOT_READY`.
+
+### Review links
+
+A `reviewUrl` is untrusted input to Salesforce. It is used only for browser
+navigation (a link that opens in a new tab); Salesforce never fetches it.
+
+A provider MAY send:
+
+* `null` or no field: no review link;
+* a **provider-relative path**: exactly one leading `/` followed by a
+  non-`/` character (or `/` alone), for example `/review/job_7f3a9c` or
+  `/analyze?record=0f4c&tab=fields`. It is opened on the provider origin;
+* an **absolute URL** `https://host[:port][/path][?query][#fragment]` whose
+  origin (scheme, host, port) is the origin of the configured base URL. Host
+  case and the default port 443 do not matter.
+
+Rules for both forms: at most 255 characters; only the RFC 3986 characters
+`A-Z a-z 0-9 - . _ ~ : / ? # @ ! $ & ' ( ) * + , ; = %` (no spaces, quotes,
+angle brackets, braces, square brackets or backslashes); a host made of
+letters, digits, dots and hyphens; no user information (`user:pass@`).
+
+| Value | Salesforce |
+|---|---|
+| `/review/1`, `/analyze?record=1#top` | Stored; offered as `https://<provider origin>/review/1` |
+| `https://provider.example.com/review/1` with base URL `https://provider.example.com/connect` | Stored; offered as is |
+| `https://review.example.com/1`, `https://provider.example.com:8443/1` (another origin) | Stored but never offered as a link |
+| `http://…`, `javascript:…`, `data:…`, any other scheme, `//host/…`, `/\host`, `https://user:pass@host/…`, spaces, line breaks, over 255 characters, not a string | The whole result response is rejected: `INVALID_PROVIDER_RESPONSE` |
+
+The link MUST require the provider's normal user authentication and MUST NOT
+be a public link to the source document or contain credentials or tokens. If
+your review application runs on a different host, serve a path on the API
+origin that redirects an authenticated user there; the redirect is under your
+control, and Salesforce still only opens your own origin. Links are checked
+against the origin configured when a job is viewed, so after an administrator
+switches providers, review links of older jobs no longer lead to the previous
+provider.
 
 ## 4. States
 
@@ -300,6 +336,7 @@ charged.
 - [ ] Job IDs match `[A-Za-z0-9][A-Za-z0-9_-]{0,199}`.
 - [ ] Status endpoint echoes `jobId` and returns one of six states.
 - [ ] Result endpoint returns `jobId`, `status`, `documentType`, `result`, `warnings`, optional `reviewUrl`; 409 `RESULT_NOT_READY` before then.
+- [ ] `reviewUrl` is `null`, a provider-relative path or an `https://` URL on your API origin, behind normal sign-in.
 - [ ] Review completion is visible through the normal status/result endpoints.
 - [ ] Unknown jobs return 404 `NOT_FOUND` after authentication.
 - [ ] Temporary problems return 429/5xx with optional `Retry-After`; persistent quota problems use `QUOTA_EXCEEDED`.

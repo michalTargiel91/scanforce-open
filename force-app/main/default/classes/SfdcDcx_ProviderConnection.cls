@@ -79,13 +79,21 @@ public with sharing class SfdcDcx_ProviderConnection {
     return value;
   }
 
-  /** scheme://host[:port] of an HTTPS endpoint, or null. */
+  /** Canonical scheme://host[:port] of an HTTPS endpoint, or null. */
   public static String origin(String endpoint) {
     String value = normalizeEndpoint(endpoint);
     if (value == null)
       return null;
     Integer pathStart = value.indexOf('/', 'https://'.length());
-    return pathStart < 0 ? value : value.left(pathStart);
+    return canonicalOrigin(pathStart < 0 ? value : value.left(pathStart));
+  }
+
+  /** Lower-case host without the default port, so two spellings of one origin compare equal. */
+  public static String canonicalOrigin(String schemeAndAuthority) {
+    return 'https://' +
+      schemeAndAuthority.substring('https://'.length())
+        .toLowerCase()
+        .removeEnd(':443');
   }
 
   public static String host(String endpoint) {
@@ -126,9 +134,19 @@ public with sharing class SfdcDcx_ProviderConnection {
       String text = failure.getMessage() == null
         ? ''
         : failure.getMessage().toLowerCase();
-      result.outcome = text.contains('credential')
-        ? 'NO_CREDENTIAL_ACCESS'
-        : 'UNREACHABLE';
+      // Without a stored key Salesforce rejects the header formula locally
+      // ("Field SfdcDcx_ProviderAuth.Token does not exist") and sends nothing.
+      if (
+        text.contains(
+          (AUTH_API_NAME + '.' + TOKEN_PARAMETER).toLowerCase() +
+          ' does not exist'
+        )
+      )
+        result.outcome = 'NO_CREDENTIAL';
+      else
+        result.outcome = text.contains('credential')
+          ? 'NO_CREDENTIAL_ACCESS'
+          : 'UNREACHABLE';
       return result;
     }
     result.elapsedMs = System.currentTimeMillis() - started;

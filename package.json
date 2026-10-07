@@ -1,6 +1,6 @@
 {
   "name": "scanforce-open",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0",
   "description": "Open-source document intelligence workspace for Salesforce. Use DocSolved.ai or bring your own compatible backend.",
   "private": true,
   "license": "Apache-2.0",

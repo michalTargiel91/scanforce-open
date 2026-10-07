@@ -7,9 +7,9 @@ every background and experience level, and keep discussions focused on the
 work. Harassment, personal attacks and publishing others' private information
 are not acceptable.
 
-Report unacceptable behaviour privately to the maintainers through this
-repository's private reporting channel (Security → Report a vulnerability may be
-used for conduct reports as well) or the contact published at
-[docsolved.ai](https://docsolved.ai). Reports are handled confidentially.
+Report unacceptable behaviour privately to the maintainers at
+[hello@synairo.com](mailto:hello@synairo.com) (SYNAIRO sp. z o.o., the company
+behind DocSolved.ai and the copyright holder in [NOTICE](NOTICE)). Reports are
+handled confidentially.
 Maintainers may remove comments, commits and contributions that violate this
 code and may restrict participation.

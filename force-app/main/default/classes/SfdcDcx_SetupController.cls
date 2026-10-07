@@ -117,26 +117,23 @@ public with sharing class SfdcDcx_SetupController {
     return status;
   }
 
+  /**
+   * Points the Named Credential at a new endpoint. Refuses while a credential for
+   * another provider origin is still stored: removeCredentialForEndpoint must run
+   * first, in its own transaction, because Salesforce does not allow a credential
+   * change and a Named Credential change in one transaction (mixed setup DML).
+   */
   @AuraEnabled
   public static SetupStatus saveEndpoint(String url) {
     requireAdmin();
-    String normalized = SfdcDcx_ProviderConnection.normalizeEndpoint(url);
-    if (normalized == null)
+    String normalized = normalizedOrDenied(url);
+    if (
+      credentialBelongsElsewhere(SfdcDcx_ProviderConnection.read(), normalized)
+    )
       throw SfdcDcx_WorkspaceController.denied(
-        'Enter an HTTPS base URL without query string or credentials, for example https://provider.example.com/connect.'
+        'The stored API key belongs to the current provider. Remove it before pointing ScanForce Open at another provider.'
       );
-    SfdcDcx_ProviderConnection.State state = SfdcDcx_ProviderConnection.read();
-    String previousHost = SfdcDcx_ProviderConnection.host(state.endpointUrl);
-    // A stored credential belongs to the provider it was issued by. When the host
-    // changes away from a real provider, remove it so it is never sent elsewhere.
-    Boolean clearCredential =
-      previousHost != null &&
-      !previousHost.endsWith('.invalid') &&
-      previousHost != SfdcDcx_ProviderConnection.host(normalized) &&
-      !state.parameterNames.isEmpty();
     try {
-      if (clearCredential)
-        SfdcDcx_ProviderConnection.clearToken();
       SfdcDcx_ProviderConnection.updateEndpoint(normalized);
     } catch (Exception failure) {
       throw SfdcDcx_WorkspaceController.denied(
@@ -146,6 +143,61 @@ public with sharing class SfdcDcx_SetupController {
     // Credential and schedule changes are setup operations: never mix them with
     // the settings DML in getStatus(). The page re-reads status in a new transaction.
     return buildStatus();
+  }
+
+  /**
+   * First half of a provider switch: removes the stored credential when the given
+   * endpoint is on another provider origin, so the key is gone before any request
+   * can reach the new host. A no-op for the same origin.
+   */
+  @AuraEnabled
+  public static SetupStatus removeCredentialForEndpoint(String url) {
+    requireAdmin();
+    String normalized = normalizedOrDenied(url);
+    if (
+      credentialBelongsElsewhere(SfdcDcx_ProviderConnection.read(), normalized)
+    )
+      try {
+        SfdcDcx_ProviderConnection.clearToken();
+      } catch (Exception failure) {
+        throw SfdcDcx_WorkspaceController.denied(
+          'Salesforce did not remove the stored API key. Check that you can manage External Credentials.'
+        );
+      }
+    // Credential and schedule changes are setup operations: never mix them with
+    // the settings DML in getStatus(). The page re-reads status in a new transaction.
+    return buildStatus();
+  }
+
+  private static String normalizedOrDenied(String url) {
+    String normalized = SfdcDcx_ProviderConnection.normalizeEndpoint(url);
+    if (normalized == null)
+      throw SfdcDcx_WorkspaceController.denied(
+        'Enter an HTTPS base URL without query string or credentials, for example https://provider.example.com/connect.'
+      );
+    return normalized;
+  }
+
+  /**
+   * A stored credential belongs to the provider origin (scheme, host, port) it was
+   * issued for. It must not survive a move to another origin, or from an endpoint
+   * whose origin cannot be read. Only the install placeholder keeps a key entered
+   * before the first real endpoint.
+   */
+  private static Boolean credentialBelongsElsewhere(
+    SfdcDcx_ProviderConnection.State state,
+    String normalizedTarget
+  ) {
+    String previousHost = SfdcDcx_ProviderConnection.host(state.endpointUrl);
+    String previousOrigin = SfdcDcx_ProviderConnection.origin(
+      state.endpointUrl
+    );
+    Boolean placeholder =
+      previousHost != null && previousHost.endsWith('.invalid');
+    return !state.parameterNames.isEmpty() &&
+      !placeholder &&
+      (previousOrigin == null ||
+      previousOrigin != SfdcDcx_ProviderConnection.origin(normalizedTarget));
   }
 
   @AuraEnabled

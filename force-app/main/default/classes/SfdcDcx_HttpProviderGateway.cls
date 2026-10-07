@@ -142,9 +142,14 @@ public with sharing class SfdcDcx_HttpProviderGateway implements SfdcDcx_Provide
       !(payload.get('warnings') instanceof List<Object>)
     )
       return terminalError('INVALID_PROVIDER_RESPONSE');
-    String reviewUrl = safeUrl(payload.get('reviewUrl'));
-    if (payload.get('reviewUrl') != null && reviewUrl == null)
+    Object rawReviewUrl = payload.get('reviewUrl');
+    if (
+      rawReviewUrl != null &&
+      !(rawReviewUrl instanceof String &&
+      SfdcDcx_ReviewLink.isAcceptable((String) rawReviewUrl))
+    )
       return terminalError('INVALID_PROVIDER_RESPONSE');
+    String reviewUrl = (String) rawReviewUrl;
     Map<String, Object> compact = new Map<String, Object>{
       'jobId' => status.providerJobId,
       'status' => providerState,
@@ -244,21 +249,6 @@ public with sharing class SfdcDcx_HttpProviderGateway implements SfdcDcx_Provide
     }
     seconds = Math.max(60, Math.min(600, seconds));
     return (seconds.round(System.RoundingMode.CEILING).intValue() + 59) / 60;
-  }
-
-  private static String safeUrl(Object value) {
-    if (value == null)
-      return null;
-    if (!(value instanceof String))
-      return null;
-    String url = (String) value;
-    return url.length() <= 255 &&
-      (url.startsWith('https://') ||
-      (url.startsWith('/') && !url.startsWith('//'))) &&
-      !url.contains('\n') &&
-      !url.contains('\r')
-      ? url
-      : null;
   }
 
   private static SfdcDcx_ProviderResponse terminalError(String code) {
