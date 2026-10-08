@@ -189,4 +189,37 @@ describe("c-sfdc-dcx-record-documents", () => {
       jest.useRealTimers();
     }
   });
+
+  it("keeps refreshing after a poll fails and clears the error when the next poll succeeds", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+    try {
+      getContext.mockResolvedValue({ canSubmit: true, acceptedFormats: [] });
+      listRecordFiles.mockResolvedValue([]);
+      listJobs.mockResolvedValue([
+        { id: "a01", name: "DOC-1", status: "Processing" },
+      ]);
+      const element = createElement("c-sfdc-dcx-record-documents", {
+        is: SfdcDcxRecordDocuments,
+      });
+      element.recordId = "001A";
+      document.body.appendChild(element);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(1);
+
+      listJobs.mockRejectedValueOnce({
+        body: { message: "Transient failure" },
+      });
+      jest.advanceTimersByTime(8000);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(2);
+      expect(element.shadowRoot.textContent).toContain("Transient failure");
+
+      jest.advanceTimersByTime(8000);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(3);
+      expect(element.shadowRoot.textContent).not.toContain("Transient failure");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

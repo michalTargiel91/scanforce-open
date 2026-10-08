@@ -69,6 +69,7 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
     }
     this.files = files;
     this.jobs = jobs;
+    this.loadError = undefined;
     this.schedule();
   }
 
@@ -87,6 +88,8 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
         } else {
           this.loadRecordData().catch((error) => {
             this.loadError = reduceError(error);
+            // A transient failure must not end live updates; the idle limit still bounds them.
+            this.schedule();
           });
         }
       }, POLL_INTERVAL_MS);

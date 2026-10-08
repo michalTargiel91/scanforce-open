@@ -192,6 +192,51 @@ private class SfdcDcx_SetupControllerTest {
     }
   }
 
+  /** Seeds a connector-owned job; production code creates and moves jobs only through the service. */
+  private static SfdcDcx_Processing_Job__c activityJob(
+    String key,
+    String status,
+    Datetime nextAttemptAt
+  ) {
+    return new SfdcDcx_Processing_Job__c(
+      Source_File_Id__c = '068000000000' + key + 'AAA',
+      Dedup_Hash__c = 'activity-dedup-' + key,
+      Submission_Key__c = 'activity-key-' + key,
+      Correlation_Id__c = 'activity-correlation-' + key,
+      Status__c = status,
+      Attempt_Count__c = 0,
+      Next_Attempt_At__c = nextAttemptAt
+    );
+  }
+
+  @IsTest
+  static void overdueCountsWorkNobodyHasStartedAsWellAsStalledRetries() {
+    configuredBackend('https://provider.example.com/connect');
+    Datetime now = System.now();
+    List<SfdcDcx_Processing_Job__c> jobs = new List<SfdcDcx_Processing_Job__c>{
+      activityJob('001', 'Queued', null),
+      activityJob('002', 'Queued', null),
+      activityJob('003', 'Processing', now.addMinutes(-30)),
+      activityJob('004', 'Processing', now.addMinutes(10)),
+      activityJob('005', 'Completed', null),
+      activityJob('006', 'Review Required', null)
+    };
+    Database.insert(jobs, AccessLevel.SYSTEM_MODE);
+    Test.setCreatedDate(jobs[0].Id, now.addMinutes(-30));
+    Test.setCreatedDate(jobs[1].Id, now.addMinutes(-5));
+    Test.setCreatedDate(jobs[2].Id, now.addMinutes(-90));
+    Test.setCreatedDate(jobs[3].Id, now.addMinutes(-90));
+    Test.setCreatedDate(jobs[4].Id, now.addMinutes(-90));
+    Test.setCreatedDate(jobs[5].Id, now.addMinutes(-90));
+    System.runAs(SfdcDcx_TestFactory.userByAlias('sfoadm')) {
+      System.assertEquals(
+        2,
+        SfdcDcx_SetupController.getStatus().activity.overdue,
+        'A Queued job nobody has started for 30 minutes and a retry that was due 30 minutes ago are overdue; a 5 minute old job, a future retry, Completed and Review Required work are not'
+      );
+    }
+  }
+
   @IsTest
   static void changingProviderHostRemovesTheStoredKey() {
     FakeBackend backend = configuredBackend('https://docsolved.ai/connect');
