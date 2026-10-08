@@ -34,8 +34,11 @@ export default class SfdcDcxJobDetail extends NavigationMixin(
   diagnosticsOpen = false;
   pollTimer;
   watchPolls = 0;
+  watchRequested = false;
   lastChangeAt = Date.now();
   connected = false;
+  // Only the newest request may write state: responses can arrive out of order.
+  loadRequest = 0;
 
   connectedCallback() {
     this.connected = true;
@@ -48,8 +51,12 @@ export default class SfdcDcxJobDetail extends NavigationMixin(
   }
 
   async load() {
+    const request = ++this.loadRequest;
     try {
       const job = await getJob({ jobId: this.recordId });
+      if (request !== this.loadRequest) {
+        return;
+      }
       const changed =
         !this.job ||
         this.job.status !== job.status ||
@@ -62,9 +69,14 @@ export default class SfdcDcxJobDetail extends NavigationMixin(
       this.job = job;
       this.loadError = undefined;
     } catch (error) {
+      if (request !== this.loadRequest) {
+        return;
+      }
       this.loadError = reduceError(error);
     } finally {
-      this.loading = false;
+      if (request === this.loadRequest) {
+        this.loading = false;
+      }
     }
     this.schedule();
   }
@@ -84,9 +96,30 @@ export default class SfdcDcxJobDetail extends NavigationMixin(
       if (watching) {
         this.watchPolls -= 1;
       }
-      // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
-      this.pollTimer = setTimeout(() => this.load(), POLL_INTERVAL_MS);
+      this.armPoll();
+    } else if (this.watchRequested) {
+      this.watchRequested = false;
+      // The page no longer updates by itself: say what the last check found.
+      this.actionMessage =
+        this.job && this.job.status === "Review Required"
+          ? actionMessage("REFRESH_NO_CHANGE")
+          : undefined;
     }
+  }
+
+  armPoll() {
+    // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
+    this.pollTimer = setTimeout(() => {
+      if (!this.connected) {
+        return;
+      }
+      if (document.visibilityState === "hidden") {
+        // Nothing is requested while the tab is hidden; check again when it is shown.
+        this.armPoll();
+        return;
+      }
+      this.load();
+    }, POLL_INTERVAL_MS);
   }
 
   get info() {
@@ -250,6 +283,7 @@ export default class SfdcDcxJobDetail extends NavigationMixin(
         this.toast("Request sent", this.actionMessage, "success");
       }
       this.watchPolls = watch ? REFRESH_WATCH_POLLS : 0;
+      this.watchRequested = Boolean(watch);
       this.lastChangeAt = Date.now();
       await this.load();
     } catch (error) {

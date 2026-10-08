@@ -380,4 +380,56 @@ describe("c-sfdc-dcx-setup", () => {
     );
     expect(saveEndpoint).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps an unsaved endpoint when the page re-reads its status", async () => {
+    getStatus.mockResolvedValue(
+      status({
+        providerKind: "docsolved",
+        endpoint: {
+          exists: true,
+          url: "https://docsolved.ai/connect",
+          host: "docsolved.ai",
+          https: true,
+          placeholder: false,
+          endsWithConnect: true,
+          ready: true,
+        },
+      }),
+    );
+    const element = mount();
+    await settle();
+    element.shadowRoot.querySelector('button[data-kind="custom"]').click();
+    await settle();
+    const input = () =>
+      element.shadowRoot.querySelector("lightning-input.sfo-endpoint-input");
+    input().dispatchEvent(
+      new CustomEvent("change", {
+        detail: { value: "https://new.example.com/connect" },
+      }),
+    );
+    await settle();
+    Array.from(element.shadowRoot.querySelectorAll("lightning-button-icon"))
+      .find((icon) => icon.alternativeText === "Refresh")
+      .click();
+    await settle();
+    expect(input().value).toBe("https://new.example.com/connect");
+  });
+
+  it("shows a loading indicator until the status arrives", async () => {
+    let release;
+    getStatus.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const element = mount();
+    await settle();
+    expect(
+      element.shadowRoot.querySelector("lightning-spinner"),
+    ).not.toBeNull();
+    release(status());
+    await settle();
+    expect(element.shadowRoot.querySelector("lightning-spinner")).toBeNull();
+  });
 });

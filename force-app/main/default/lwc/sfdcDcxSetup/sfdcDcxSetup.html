@@ -25,7 +25,13 @@
           onclick={load}
         ></lightning-button-icon>
       </div>
-      <div class="slds-p-horizontal_medium">
+      <div class="slds-p-horizontal_medium slds-is-relative">
+        <template lwc:if={showSpinner}>
+          <lightning-spinner
+            alternative-text="Working"
+            size="medium"
+          ></lightning-spinner>
+        </template>
         <template lwc:if={loadError}>
           <div
             class="slds-notify slds-notify_alert slds-alert_error"

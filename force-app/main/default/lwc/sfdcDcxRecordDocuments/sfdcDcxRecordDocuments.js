@@ -30,6 +30,7 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
   files = [];
   jobs = [];
   submitting = false;
+  loading = true;
   pollTimer;
   lastChangeAt = Date.now();
   lastSignature = "";
@@ -54,6 +55,8 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
       this.loadError = undefined;
     } catch (error) {
       this.loadError = reduceError(error);
+    } finally {
+      this.loading = false;
     }
   }
 
@@ -81,19 +84,28 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
       hasActive(this.jobs) &&
       Date.now() - this.lastChangeAt < POLL_IDLE_LIMIT_MS
     ) {
-      // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
-      this.pollTimer = setTimeout(() => {
-        if (document.visibilityState === "hidden") {
-          this.schedule();
-        } else {
-          this.loadRecordData().catch((error) => {
-            this.loadError = reduceError(error);
-            // A transient failure must not end live updates; the idle limit still bounds them.
-            this.schedule();
-          });
-        }
-      }, POLL_INTERVAL_MS);
+      this.armPoll();
     }
+  }
+
+  armPoll() {
+    // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
+    this.pollTimer = setTimeout(() => {
+      if (!this.connected) {
+        return;
+      }
+      if (document.visibilityState === "hidden") {
+        // Nothing is sent while the tab is hidden, but the wait goes on, so the list
+        // refreshes as soon as the tab is shown again; the idle limit is judged after that.
+        this.armPoll();
+        return;
+      }
+      this.loadRecordData().catch((error) => {
+        this.loadError = reduceError(error);
+        // A transient failure must not end live updates; the idle limit still bounds them.
+        this.schedule();
+      });
+    }, POLL_INTERVAL_MS);
   }
 
   get ready() {
@@ -172,7 +184,10 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
         reprocess: false,
       });
       const rejected = results.filter((result) => !result.success);
-      if (rejected.length) {
+      const accepted = results.length - rejected.length;
+      if (rejected.length && !accepted && rejected[0].errorMessage) {
+        this.toast("Submission failed", rejected[0].errorMessage, "error");
+      } else if (rejected.length) {
         const info = errorInfo(rejected[0].errorCode);
         this.toast(
           `${rejected.length} file(s) not submitted`,
@@ -180,7 +195,6 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
           "warning",
         );
       }
-      const accepted = results.length - rejected.length;
       if (accepted) {
         this.toast(
           "Processing started",
@@ -189,11 +203,16 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
         );
       }
       this.lastChangeAt = Date.now();
-      await this.loadRecordData();
     } catch (error) {
       this.toast("Submission failed", reduceError(error), "error");
     } finally {
       this.submitting = false;
+    }
+    // A reload that fails is not a failed submission: say so where the list is.
+    try {
+      await this.loadRecordData();
+    } catch (error) {
+      this.loadError = reduceError(error);
     }
   }
 

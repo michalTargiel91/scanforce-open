@@ -129,7 +129,7 @@ export default class SfdcDcxMappingPanel extends LightningElement {
             detail: { recordId: this.preview.recordId },
           }),
         );
-        this.preview = await previewMappings({ jobId: this.jobId });
+        await this.refreshPreviewAfterApply();
       } else {
         this.toast(
           "Record not updated",
@@ -141,6 +141,21 @@ export default class SfdcDcxMappingPanel extends LightningElement {
       this.toast("Record not updated", reduceError(error), "error");
     } finally {
       this.busy = false;
+    }
+  }
+
+  /** The record is already updated: a failing re-preview must not read as a failed update. */
+  async refreshPreviewAfterApply() {
+    try {
+      this.preview = await previewMappings({ jobId: this.jobId });
+    } catch (error) {
+      // The old preview no longer describes the record; do not offer it again.
+      this.preview = undefined;
+      this.toast(
+        "Could not refresh the preview",
+        reduceError(error),
+        "warning",
+      );
     }
   }
 

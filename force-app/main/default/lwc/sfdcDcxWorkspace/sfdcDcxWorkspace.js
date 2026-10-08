@@ -134,14 +134,22 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
     // A request that resolves after removal must not re-arm the timer.
     this.polling = this.connected && hasActive(this.jobs) && !idleTooLong;
     if (this.polling) {
-      // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
-      this.pollTimer = setTimeout(() => this.poll(), POLL_INTERVAL_MS);
+      this.armPoll();
     }
+  }
+
+  armPoll() {
+    // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
+    this.pollTimer = setTimeout(() => this.poll(), POLL_INTERVAL_MS);
   }
 
   async poll() {
     if (document.visibilityState === "hidden") {
-      this.schedulePolling();
+      // Nothing is sent while the tab is hidden, but the wait goes on, so the page
+      // refreshes as soon as it is shown again. The idle limit is judged after that.
+      if (this.connected) {
+        this.armPoll();
+      }
       return;
     }
     await this.loadJobs();
@@ -220,6 +228,9 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
   }
 
   get emptyMessage() {
+    if (this.jobsLoading || (this.loadError && this.jobs.length === 0)) {
+      return "";
+    }
     return this.filter === "all"
       ? "No processing jobs yet. Upload a document to get started."
       : "No processing jobs match this filter.";
@@ -441,18 +452,27 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
           url: result.processingJobId
             ? `/lightning/r/${result.processingJobId}/view`
             : null,
-          message: info ? `${info.title}. ${info.detail}` : "",
+          message: info
+            ? `${info.title}. ${info.detail}${result.errorMessage ? ` ${result.errorMessage}` : ""}`
+            : "",
         };
       });
       const accepted = results.filter((result) => result.success).length;
       const rejected = results.length - accepted;
-      this.toast(
-        accepted ? "Documents submitted" : "Nothing submitted",
-        rejected
-          ? `${accepted} submitted, ${rejected} rejected. See Last submission for details.`
-          : `${accepted} document(s) are being processed in the background.`,
-        rejected ? "warning" : "success",
+      const failure = results.find(
+        (result) => result.errorCode === "SUBMISSION_FAILED",
       );
+      if (!accepted && failure) {
+        this.toast("Submission failed", failure.errorMessage, "error");
+      } else {
+        this.toast(
+          accepted ? "Documents submitted" : "Nothing submitted",
+          rejected
+            ? `${accepted} submitted, ${rejected} rejected. See Last submission for details.`
+            : `${accepted} document(s) are being processed in the background.`,
+          rejected ? "warning" : "success",
+        );
+      }
       this.lastChangeAt = Date.now();
       if (
         this.filter !== "all" &&

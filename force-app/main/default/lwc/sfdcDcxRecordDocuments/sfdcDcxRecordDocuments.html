@@ -9,6 +9,14 @@
           onclick={handleRefresh}
         ></lightning-button-icon>
       </div>
+      <template lwc:if={loading}>
+        <div class="slds-is-relative slds-p-around_large">
+          <lightning-spinner
+            alternative-text="Loading documents"
+            size="small"
+          ></lightning-spinner>
+        </div>
+      </template>
       <template lwc:if={loadError}>
         <p class="slds-p-horizontal_medium slds-text-color_error">
           {loadError}
