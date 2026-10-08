@@ -360,7 +360,9 @@ public with sharing class SfdcDcx_FieldMappingService {
     } catch (Exception invalidId) {
       return 'NO_SOURCE_RECORD';
     }
-    plan.objectType = plan.preview.recordId.getSObjectType();
+    plan.objectType = SfdcDcx_RecordLabels.objectTypeOf(plan.preview.recordId);
+    if (plan.objectType == null)
+      return 'SOURCE_RECORD_NOT_ACCESSIBLE';
     Schema.DescribeSObjectResult describe = plan.objectType.getDescribe();
     plan.preview.objectApiName = describe.getName();
     plan.preview.objectLabel = describe.getLabel();

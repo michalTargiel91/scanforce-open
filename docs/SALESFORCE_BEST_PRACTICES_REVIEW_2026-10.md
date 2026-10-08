@@ -52,18 +52,21 @@ What an architect would credit:
 * **Scale held where it was tested.** At 250,000 job records every query the app
   runs completed in about 0.5 s or less, with at most 12 ms of CPU. [M]
 
-What limits long-term adoption, in priority order:
+What limited long-term adoption at review time, in priority order (status as of **1.0.4**):
 
 1. **A single job whose update is rejected can stall all processing** (head-of-line
    blocking). Demonstrated with a customer-style validation rule. [M]
+   **Fixed in 1.0.4** via Queueable Finalizer + chain-local skip ([R1](#r1-a-job-whose-update-is-rejected-stalls-all-processing-head-of-line-blocking)).
 2. **Sustained throughput is bounded to about 20 job executions per five-minute
    sweep**, and the 60-minute age cap counts queue wait, so a large backlog turns
    healthy jobs into Timed Out: in a 300-job test, the last 60 did. [M]
-   (see [R2](#r2-throughput-and-the-60-minute-age-cap))
+   (see [R2](#r2-throughput-and-the-60-minute-age-cap)) — **still open** (separate issue).
 3. **Bulk Refresh and Recover are best effort and silent.** In a bulk call the same
-   oldest 50 Review Required jobs are always chosen. [M]
+   oldest 50 Review Required jobs are always chosen. [M] — **still open** (docs in 1.0.4; additive API later).
 4. **Recovery health is only partly visible**, and the schedule owner is not shown. [C]
+   — overdue metric fixed; owner visibility still open.
 5. **Uninstall as documented fails** at the active record page. Reproduced. [M]
+   — install guide updated in 1.0.4.
 
 Three small defects were corrected in this change, each with a test that fails
 without the fix ([Confirmed defects](#confirmed-defects)). Everything else is a
@@ -243,8 +246,15 @@ core behaves.
 
 ## R1. A job whose update is rejected stalls all processing (head-of-line blocking)
 
+**Status (1.0.4): fixed.** `SfdcDcx_ProcessingQueueable` attaches a `ChainFinalizer` that
+defers the failed job (best-effort attempt + retry delay) and continues the chain with a
+chain-local skip set and the remaining depth allowance. Live matrix on an API 67 scratch
+org confirmed healthy jobs advance behind poison rows; permanently unwriteable rows still
+cost one failed execution per sweep until the customization is fixed (documented in
+[recovery](recovery.md#a-job-that-cannot-be-processed)).
+
 * **Where:** `SfdcDcx_ProcessingQueueable.execute`, `SfdcDcx_ProcessingJobSelector.selectNextAutomatic`.
-* **Mechanism:** the next job is always the oldest due one
+* **Mechanism (pre-fix):** the next job is always the oldest due one
   (`ORDER BY Next_Attempt_At__c ASC NULLS FIRST, CreatedDate ASC LIMIT 1`). If
   `process()` throws deterministically for that job, its row never changes, the
   Queueable dies before it can enqueue a continuation, and the next sweep selects the
@@ -655,7 +665,7 @@ Ordered by severity, then likelihood, user impact and effort.
 
 | # | Recommendation | Severity | Likelihood | Impact | Effort | Change type |
 |---|---|---|---|---|---|---|
-| R1 | Make one failing job unable to stall the queue: finalizer plus chain-local skip, with a test that throws inside `process()` | Medium | Low–Medium | High | Medium | Async core; needs its own change |
+| R1 | Make one failing job unable to stall the queue: finalizer plus chain-local skip, with a test that throws inside `process()` | Medium | Low–Medium | High | Medium | **Done in 1.0.4** |
 | R2a | Document the throughput envelope and the age-cap interaction | Medium | Medium | Medium | Small | Documentation |
 | R2b | Start the age budget at the first provider attempt; let each sweep start a few chains | Medium | Medium | Medium | Medium | Behavior change |
 | R3 | Report requested and skipped counts from the Refresh and Recover Flow actions; order by least recently refreshed; document the 50 cap | Low–Medium | Medium | Medium | Medium | Public contract (minor release) |

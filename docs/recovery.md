@@ -35,6 +35,21 @@ never reach the provider, run **Test connection** on the Configuration page: it
 reports *No API key stored* or *No access to the provider credential* for these
 cases.
 
+## A job that cannot be processed
+
+Processing can fail in a way ScanForce Open cannot handle itself: another customization on
+the processing job rejects the update ScanForce Open makes (a validation rule, a Flow fault
+or a trigger error), or a platform limit stops the execution. The failure does not hold up
+the jobs behind it. A finalizer runs after the failed execution: the job spends one attempt
+and waits for the next retry delay, and the chain carries on with the other due jobs, without
+choosing that job again, and with the depth its chain had left. The failed execution still
+shows in **Setup → Apex Jobs** with the original error, which is where to look.
+
+A job that keeps failing ends **Timed Out** when its 15 attempts or 60 minutes are used up. If
+the customization also rejects that final update, the job stays Queued and fails once per
+retry; fix the customization so it accepts updates made by ScanForce Open. A refresh you
+asked for (**Check review status**) is never retried automatically.
+
 ## Capacity
 
 Background work is deliberately bounded: each submission starts one chain of at most 20

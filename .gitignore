@@ -30,3 +30,6 @@ code-analyzer-reports/
 .DS_Store
 .playwright-mcp/
 deployment-settings-install/
+
+# Local agent runtime (auth helpers)
+.sf-agent/

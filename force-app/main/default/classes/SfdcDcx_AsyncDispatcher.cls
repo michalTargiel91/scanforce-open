@@ -27,25 +27,48 @@ public without sharing class SfdcDcx_AsyncDispatcher {
   public static void enqueueNextAutomatic(
     SfdcDcx_ProcessingQueueable.WorkItem fallback
   ) {
+    enqueueNextAutomatic(fallback, new Set<Id>(), null);
+  }
+
+  /**
+   * skip: jobs whose processing already failed in this chain; the chain does not pick
+   * them again, the next sweep decides about them. depthAllowance: set only by a
+   * finalizer, which is not a Queueable and so continues its parent's chain with the
+   * depth that chain has left instead of starting a new one with the full allowance.
+   */
+  public static void enqueueNextAutomatic(
+    SfdcDcx_ProcessingQueueable.WorkItem fallback,
+    Set<Id> skip,
+    Integer depthAllowance
+  ) {
     if (SfdcDcx_Worker.suppressEnqueue)
       return;
-    SfdcDcx_Processing_Job__c job = SfdcDcx_ProcessingJobSelector.selectNextAutomatic();
+    SfdcDcx_Processing_Job__c job = SfdcDcx_ProcessingJobSelector.selectNextAutomatic(
+      skip
+    );
     if (job == null) {
-      enqueueOne(fallback);
+      enqueueOne(fallback, depthAllowance);
       return;
     }
-    enqueueOne(
-      SfdcDcx_ProcessingQueueable.work(
-        job.Id,
-        job.Attempt_Count__c.intValue(),
-        false,
-        0,
-        String.isBlank(job.Provider_Job_Id__c) ? 'SUBMIT' : 'POLL'
-      )
+    SfdcDcx_ProcessingQueueable.WorkItem next = SfdcDcx_ProcessingQueueable.work(
+      job.Id,
+      job.Attempt_Count__c.intValue(),
+      false,
+      0,
+      String.isBlank(job.Provider_Job_Id__c) ? 'SUBMIT' : 'POLL'
     );
+    next.skip = skip;
+    enqueueOne(next, depthAllowance);
   }
 
   private static void enqueueOne(SfdcDcx_ProcessingQueueable.WorkItem item) {
+    enqueueOne(item, null);
+  }
+
+  private static void enqueueOne(
+    SfdcDcx_ProcessingQueueable.WorkItem item,
+    Integer depthAllowance
+  ) {
     if (item == null || SfdcDcx_Worker.suppressEnqueue)
       return;
     if (
@@ -73,7 +96,9 @@ public without sharing class SfdcDcx_AsyncDispatcher {
       item.delayMinutes == null ? 0 : item.delayMinutes
     );
     if (!System.isQueueable())
-      options.MaximumQueueableStackDepth = MAX_CHAIN_DEPTH;
+      options.MaximumQueueableStackDepth = depthAllowance == null
+        ? MAX_CHAIN_DEPTH
+        : depthAllowance;
     // Factory-style Builder() (no `new`) is required on API 67.
     // Logical identity remains connector + job + generation + operation.
     // Platform DuplicateSignature is capped at 32 bytes, so the identity is

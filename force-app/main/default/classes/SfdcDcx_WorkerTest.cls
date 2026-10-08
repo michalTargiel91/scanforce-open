@@ -798,6 +798,82 @@ private class SfdcDcx_WorkerTest {
   static void confirmedRemoteCancellationAllowsReplacement() {
     assertConfirmedTerminalAllowsReplacement('cancelled', 'Cancelled');
   }
+  // A failure or cancellation first seen on a poll (the provider job ID is already
+  // stored) is just as confirmed as one in the submit response: Try again must create
+  // a new attempt instead of re-polling the dead provider job forever.
+  private static void assertPolledTerminalAllowsReplacement(
+    String remote,
+    String status,
+    String errorCode
+  ) {
+    System.runAs(connectorUser()) {
+      Id original = job();
+      Id versionId = sourceFileId(original);
+      seedRemote(original, 'Processing', 1, 'remote_1');
+      Test.setMock(HttpCalloutMock.class, new Provider(remote));
+      processJob(original, 1);
+      System.assertEquals(status, read(original).Status__c);
+      System.assertEquals(errorCode, read(original).Error_Code__c);
+      System.assertEquals(null, read(original).Submission_Key__c);
+      SfdcDcx_Submit.Input retry = new SfdcDcx_Submit.Input();
+      retry.contentVersionId = versionId;
+      System.assertNotEquals(
+        original,
+        SfdcDcx_Submit.submit(new List<SfdcDcx_Submit.Input>{ retry })[0]
+          .processingJobId
+      );
+    }
+  }
+  @IsTest
+  static void polledRemoteFailureAllowsReplacement() {
+    assertPolledTerminalAllowsReplacement(
+      'failed',
+      'Failed',
+      'REMOTE_JOB_FAILED'
+    );
+  }
+  @IsTest
+  static void polledRemoteCancellationAllowsReplacement() {
+    assertPolledTerminalAllowsReplacement(
+      'cancelled',
+      'Cancelled',
+      'REMOTE_JOB_CANCELLED'
+    );
+  }
+  // An outcome the provider did not confirm keeps the identity: Try again reconciles
+  // with the same provider job and never uploads the file a second time.
+  private static void assertPolledErrorKeepsIdentity(
+    Integer httpStatus,
+    String errorCode
+  ) {
+    System.runAs(connectorUser()) {
+      Id original = job();
+      Id versionId = sourceFileId(original);
+      seedRemote(original, 'Processing', 1, 'remote_1');
+      Provider mock = new Provider('failed');
+      mock.code = httpStatus;
+      Test.setMock(HttpCalloutMock.class, mock);
+      processJob(original, 1);
+      System.assertEquals('Failed', read(original).Status__c);
+      System.assertEquals(errorCode, read(original).Error_Code__c);
+      System.assertNotEquals(null, read(original).Submission_Key__c);
+      SfdcDcx_Submit.Input retry = new SfdcDcx_Submit.Input();
+      retry.contentVersionId = versionId;
+      System.assertEquals(
+        original,
+        SfdcDcx_Submit.submit(new List<SfdcDcx_Submit.Input>{ retry })[0]
+          .processingJobId
+      );
+    }
+  }
+  @IsTest
+  static void polledIdempotencyConflictKeepsIdentity() {
+    assertPolledErrorKeepsIdentity(409, 'IDEMPOTENCY_CONFLICT');
+  }
+  @IsTest
+  static void polledAuthenticationFailureKeepsIdentity() {
+    assertPolledErrorKeepsIdentity(401, 'AUTHENTICATION_FAILED');
+  }
   @IsTest
   static void timedOutOrdinarySubmitKeepsIdentity() {
     System.runAs(connectorUser()) {

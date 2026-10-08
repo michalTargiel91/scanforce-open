@@ -3,14 +3,38 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.4 — 2026-10-08
 
-Result of an independent Salesforce best-practices review; findings, evidence and
-recommendations are in the [review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md).
-No change to the architecture, `/connect/v1` or any public contract.
+Patch release from the October 2026 best-practices review and follow-up fixes. Findings,
+evidence and remaining recommendations are in the
+[review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md). No change to the architecture,
+`/connect/v1`, API version (67.0) or any public contract.
+
+**Upgrading from 1.0.3:** from a checkout of this release, deploy `force-app` again
+(`bash scripts/install.sh --target-org my-org --skip-credentials --allow-pending-jobs`; see
+[upgrading](docs/install.md#upgrading)). Jobs, source associations, field mappings, permission
+sets, recovery schedules and the Named/External Credential (including a custom authentication
+formula such as HTTP Basic) are kept. Do **not** redeploy `provider-config/` over an existing
+installation. Verified on a disposable API 67 scratch org with synthetic jobs, mappings,
+twelve recovery schedules and HTTP Basic credentials preserved.
 
 ### Fixes
 
+* **One job that cannot be processed no longer stops the others.** When an execution failed
+  with an error nothing could handle (for example a customer validation rule or Flow fault that
+  rejects ScanForce Open's update), the job stayed the oldest due job and every recovery sweep
+  chose it first again, so no other job moved. A finalizer now defers the job (one attempt spent,
+  the usual retry delay) and the chain continues without it, keeping the 20-execution cap.
+  User-requested refreshes are not retried and finished jobs are not touched. Found by the
+  best-practices review, which reproduced it: ten healthy jobs stayed untouched behind one
+  rejected job, and processed within seconds once it was skipped. No schema, status or
+  public-contract change.
+* **Try again after a provider-confirmed failure or cancellation works.** Polling that
+  ends in `REMOTE_JOB_FAILED` or `REMOTE_JOB_CANCELLED` now releases the submission
+  identity so a new attempt can be submitted; uncertain outcomes still keep it.
+* **IDs of unknown or deleted object types no longer break jobs or batches.** An
+  unrecognized key prefix is treated as unavailable for that item only (submit, list,
+  details, labels and mapping eligibility), so other items continue.
 * The Configuration page's **overdue** count now includes jobs nobody has started yet
   (their `Next_Attempt_At__c` is empty), the case [recovery](docs/recovery.md) describes: a
   Queued job older than 15 minutes with no recovery schedule used to raise no warning.

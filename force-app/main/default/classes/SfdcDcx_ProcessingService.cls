@@ -147,12 +147,17 @@ public without sharing class SfdcDcx_ProcessingService {
       if (
         request != null &&
         request.contentVersionId != null &&
-        request.contentVersionId.getSObjectType() == ContentVersion.SObjectType
+        SfdcDcx_RecordLabels.objectTypeOf(request.contentVersionId) ==
+        ContentVersion.SObjectType
       )
         inputs.versionIds.add(request.contentVersionId);
       if (request != null && request.sourceRecordId != null) {
         inputs.sourceIds.add(request.sourceRecordId);
-        inputs.sourceTypes.add(request.sourceRecordId.getSObjectType());
+        Schema.SObjectType sourceType = SfdcDcx_RecordLabels.objectTypeOf(
+          request.sourceRecordId
+        );
+        if (sourceType != null)
+          inputs.sourceTypes.add(sourceType);
       }
     }
     return inputs;
@@ -340,6 +345,41 @@ public without sharing class SfdcDcx_ProcessingService {
     SfdcDcx_AsyncDispatcher.enqueueWork(work);
   }
 
+  /**
+   * Called after process() failed with an exception nothing here could handle (its
+   * transaction is rolled back, so the job looks untouched). Without this the job
+   * would stay the oldest due job and every sweep would pick it first again. It spends
+   * one attempt and backs off like any other retry. Best effort: if something rejects this
+   * write too, the job is simply skipped for the rest of the chain. Nothing changes the
+   * status here, and user-requested refreshes and finished jobs are left alone.
+   */
+  public static void deferAfterFailure(
+    Id jobId,
+    Integer generation,
+    Boolean refreshOnly
+  ) {
+    if (refreshOnly == true)
+      return;
+    SfdcDcx_Processing_Job__c job = SfdcDcx_ProcessingJobSelector.selectById(
+      jobId
+    );
+    if (
+      job == null ||
+      job.Attempt_Count__c != generation ||
+      SfdcDcx_ProcessingJobDomain.isAutomaticStop(job.Status__c)
+    )
+      return;
+    Database.update(
+      new SfdcDcx_Processing_Job__c(
+        Id = jobId,
+        Attempt_Count__c = generation + 1,
+        Next_Attempt_At__c = System.now().addMinutes(delayFor(generation))
+      ),
+      false,
+      AccessLevel.SYSTEM_MODE
+    );
+  }
+
   public static ProcessOutcome process(
     Id jobId,
     Integer generation,
@@ -454,7 +494,13 @@ public without sharing class SfdcDcx_ProcessingService {
         ? System.now()
         : null;
       change.Next_Attempt_At__c = null;
-      if (shouldReleaseSubmissionOwnership(resultingState, provider, current))
+      if (
+        shouldReleaseSubmissionOwnership(
+          resultingState,
+          change.Error_Code__c,
+          current
+        )
+      )
         change.Submission_Key__c = null;
     } else {
       change.Next_Attempt_At__c = System.now().addMinutes(delay);
@@ -536,7 +582,8 @@ public without sharing class SfdcDcx_ProcessingService {
     if (
       request == null ||
       request.contentVersionId == null ||
-      request.contentVersionId.getSObjectType() != ContentVersion.SObjectType
+      SfdcDcx_RecordLabels.objectTypeOf(request.contentVersionId) !=
+      ContentVersion.SObjectType
     )
       return 'INVALID_CONTENT_VERSION';
     ContentVersion version = versions.get(request.contentVersionId);
@@ -634,9 +681,15 @@ public without sharing class SfdcDcx_ProcessingService {
       job.Error_Code__c == 'IDEMPOTENCY_CONFLICT';
   }
 
+  /**
+   * errorCode is the code the Domain stored for this transition (REMOTE_JOB_FAILED and
+   * REMOTE_JOB_CANCELLED exist only there, never on the provider response), so a
+   * provider-confirmed end seen on a poll releases the identity like one in the
+   * submit response.
+   */
   private static Boolean shouldReleaseSubmissionOwnership(
     String resultingState,
-    SfdcDcx_ProviderResponse provider,
+    String errorCode,
     SfdcDcx_Processing_Job__c current
   ) {
     if (
@@ -646,18 +699,18 @@ public without sharing class SfdcDcx_ProcessingService {
     )
       return false;
     if (resultingState == 'Cancelled')
-      return provider.errorCode == 'REMOTE_JOB_CANCELLED' ||
+      return errorCode == 'REMOTE_JOB_CANCELLED' ||
         String.isBlank(current.Provider_Job_Id__c);
     if (resultingState != 'Failed')
       return false;
     if (
-      provider.errorCode == 'INVALID_PROVIDER_RESPONSE' ||
-      provider.errorCode == 'IDEMPOTENCY_CONFLICT'
+      errorCode == 'INVALID_PROVIDER_RESPONSE' ||
+      errorCode == 'IDEMPOTENCY_CONFLICT'
     )
       return false;
     if (
       !String.isBlank(current.Provider_Job_Id__c) &&
-      provider.errorCode != 'REMOTE_JOB_FAILED'
+      errorCode != 'REMOTE_JOB_FAILED'
     )
       return false;
     return true;

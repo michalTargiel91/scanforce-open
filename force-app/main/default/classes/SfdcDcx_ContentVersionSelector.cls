@@ -51,7 +51,10 @@ public without sharing class SfdcDcx_ContentVersionSelector {
     Set<Id> accessible = new Set<Id>();
     Map<String, Set<Id>> byType = new Map<String, Set<Id>>();
     for (Id id : ids == null ? new Set<Id>() : ids) {
-      Schema.DescribeSObjectResult describe = id.getSObjectType().getDescribe();
+      Schema.SObjectType objectType = SfdcDcx_RecordLabels.objectTypeOf(id);
+      if (objectType == null)
+        continue;
+      Schema.DescribeSObjectResult describe = objectType.getDescribe();
       if (!describe.isAccessible())
         continue;
       String typeName = describe.getName();

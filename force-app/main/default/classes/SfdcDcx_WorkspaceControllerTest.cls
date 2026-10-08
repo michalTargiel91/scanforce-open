@@ -195,4 +195,46 @@ private class SfdcDcx_WorkspaceControllerTest {
     }
     System.assertNotEquals(null, adminFile.Id);
   }
+
+  // A job outlives its source record's object (a deleted custom object, an uninstalled
+  // package). Resolving its label must degrade to "not available", not throw and take
+  // the whole job list and the job page down for everyone who can see that job.
+  @IsTest
+  static void jobWhoseSourceObjectNoLongerExistsStillOpens() {
+    System.runAs(SfdcDcx_TestFactory.userByAlias('sfows')) {
+      SfdcDcx_Processing_Job__c orphan = new SfdcDcx_Processing_Job__c(
+        OwnerId = UserInfo.getUserId(),
+        Source_File_Id__c = '068000000000000AAA',
+        Source_Record_Id__c = '000000000000000AAA',
+        File_Name__c = 'orphan.pdf',
+        Dedup_Hash__c = 'orphan-dedup',
+        Submission_Key__c = 'orphan-key',
+        Correlation_Id__c = 'orphan-correlation',
+        Status__c = 'Completed',
+        Attempt_Count__c = 1,
+        Result_JSON__c = SfdcDcx_TestFactory.INVOICE_RESULT
+      );
+      Database.insert(orphan, AccessLevel.SYSTEM_MODE);
+
+      List<SfdcDcx_WorkspaceController.JobRow> rows = SfdcDcx_WorkspaceController.listJobs(
+        'all',
+        null,
+        10
+      );
+      System.assertEquals(1, rows.size());
+      System.assertEquals(false, rows[0].source.accessible);
+
+      SfdcDcx_JobController.JobDetail detail = SfdcDcx_JobController.getJob(
+        orphan.Id
+      );
+      System.assertEquals(false, detail.source.accessible);
+      System.assertEquals(false, detail.actions.canApply);
+
+      SfdcDcx_FieldMappingService.Preview preview = SfdcDcx_FieldMappingService.preview(
+        orphan.Id
+      );
+      System.assertEquals(false, preview.applicable);
+      System.assertEquals('SOURCE_RECORD_NOT_ACCESSIBLE', preview.reasonCode);
+    }
+  }
 }
