@@ -3,11 +3,19 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.4 — 2026-10-08
 
-Result of an independent Salesforce best-practices review; findings, evidence and
-recommendations are in the [review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md).
-No change to the architecture, `/connect/v1` or any public contract.
+Patch release from the October 2026 best-practices review and follow-up fixes. Findings,
+evidence and remaining recommendations are in the
+[review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md). No change to the architecture,
+`/connect/v1`, API version (67.0) or any public contract.
+
+**Upgrading from 1.0.3:** deploy `force-app` again
+(`bash scripts/install.sh --target-org my-org --skip-credentials --allow-pending-jobs`; see
+[upgrading](docs/install.md#upgrading)). Jobs, source associations, field mappings, permission
+sets, recovery schedules and the Named/External Credential (including a custom authentication
+formula such as HTTP Basic) are kept. Do **not** redeploy `provider-config/` over an existing
+installation.
 
 ### Fixes
 
