@@ -22,6 +22,8 @@ No change to the architecture, `/connect/v1` or any public contract.
 
 ### Documentation
 
+* Capacity: the [recovery guide](docs/recovery.md#capacity) now states the measured throughput
+  (20 executions per five-minute sweep) and that the 60-minute budget counts queue wait.
 * Uninstalling: the delete stops at the active record page; the install guide now says how
   to release it (verified with 250,000 job records present).
 * New [best-practices review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md): measured

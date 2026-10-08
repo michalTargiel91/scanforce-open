@@ -16,7 +16,7 @@ running org.
 
 | Label | Meaning |
 |---|---|
-| **[M]** | Measured by this review in a disposable API 67 scratch org (Enterprise or Developer edition, synthetic data). |
+| **[M]** | Executed by this review: in a disposable API 67 scratch org (Enterprise or Developer edition, synthetic data), or as a red-then-green test run. |
 | **[T]** | An existing automated test covers it. The test name is given. |
 | **[C]** | Established by reading the code path. |
 | **[R]** | Reported by a delegated read-only reviewer (Lightning Web Components). Marked *re-read* where I confirmed the code path myself. |
@@ -58,9 +58,10 @@ What limits long-term adoption, in priority order:
    blocking). Demonstrated with a customer-style validation rule. [M]
 2. **Sustained throughput is bounded to about 20 job executions per five-minute
    sweep**, and the 60-minute age cap counts queue wait, so a large backlog turns
-   healthy jobs into Timed Out. [M] (see [R2](#r2-throughput-and-the-60-minute-age-cap))
-3. **Bulk Refresh and Recover are best effort and silent.** The same oldest 50
-   Review Required jobs are always chosen. [M]
+   healthy jobs into Timed Out: in a 300-job test, the last 60 did. [M]
+   (see [R2](#r2-throughput-and-the-60-minute-age-cap))
+3. **Bulk Refresh and Recover are best effort and silent.** In a bulk call the same
+   oldest 50 Review Required jobs are always chosen. [M]
 4. **Recovery health is only partly visible**, and the schedule owner is not shown. [C]
 5. **Uninstall as documented fails** at the active record page. Reproduced. [M]
 
@@ -249,13 +250,25 @@ core behaves.
   Queueable exception at API 67. The parent's DML was rolled back, the finalizer saw
   `UNHANDLED_EXCEPTION` with the exception type and message, and its own DML committed.
   PMD already reports `QueueableWithoutFinalizer` on the two Queueables (advisory).
-* **Recommendation (proposal, not prototyped end to end):** attach a finalizer in
-  `ProcessingQueueable.execute` that, on failure, (a) best-effort advances the job's
-  `Attempt_Count__c` and `Next_Attempt_At__c` with `allOrNone=false` so the 15-attempt
-  and 60-minute budgets eventually retire it, and (b) continues the chain with the failed
-  job ID carried as a chain-local skip, so one blocked job costs one execution per sweep
-  instead of everything. If the customer rule rejects *every* write to the row, only (b)
-  helps. Unverified: finalizer enqueue limits and consecutive-failure behavior. [U]
+* **Recommendation:** attach a finalizer in `ProcessingQueueable.execute` that, on
+  failure, (a) best-effort advances the job's `Attempt_Count__c` and `Next_Attempt_At__c`
+  with `allOrNone=false` so the 15-attempt and 60-minute budgets eventually retire it, and
+  (b) continues the chain with the failed job ID carried as a chain-local skip, so one
+  blocked job costs one execution per sweep instead of everything. If the customer rule
+  rejects *every* write to the row, only (b) helps.
+* **Prototype result [M]:** about 50 lines across `SfdcDcx_ProcessingQueueable`,
+  `SfdcDcx_AsyncDispatcher` and `SfdcDcx_ProcessingJobSelector` (a `Finalizer` on the
+  Queueable, a `skip` set on the work item, and `AND Id NOT IN :skip` in the sweep query)
+  were deployed to the experiment org only, not to this repository. In the first sweep
+  after deployment the poison job's Queueable still failed (08:10:08), then the chain
+  continued and ten more executions completed within six seconds, taking the ten
+  healthy jobs that had been stuck for over 20 minutes to a final state. The poison job
+  stayed `Queued`: here the rule also blocks the finalizer's own update, so its cost is one
+  failed execution per sweep.
+* **Prototype limits:** no tests were written; the retry-budget path (a) was blocked by the
+  rule in this scenario and therefore not exercised; finalizer enqueue limits and
+  consecutive-failure behavior were not examined. [U] It shows the design is feasible, not
+  that it is finished.
 
 ## R2. Throughput and the 60-minute age cap
 
@@ -264,8 +277,8 @@ core behaves.
 * **Measured [M]:** a backlog of 120 due jobs on an Enterprise-edition scratch org was
   drained by the installed schedule at **exactly 20 jobs per sweep**: 20 at 07:20 (in
   about 65 s, so about 3 s per chained execution), then 40, 60 and 80 at the following
-  sweeps. A probe chain with the dispatcher's own `AsyncOptions` ran 20 executions, and
-  the 21st enqueue threw `System.AsyncException: Maximum stack depth has been reached`.
+  sweeps. A probe chain started with `MaximumQueueableStackDepth = 20` (the option the dispatcher
+  sets) ran 20 executions, and the 21st enqueue threw `System.AsyncException: Maximum stack depth has been reached`.
   A second, 300-job backlog was run to test the age cap (below).
 * **Why it matters:** a document needs one execution to send and at least one more to
   collect the result. Capacity in the first hour is about 12 sweeps × 20 = 240 executions
@@ -274,7 +287,17 @@ core behaves.
   exceed it. That threshold is a projection from the measured per-sweep figure, not a
   measurement of real documents. The age limit is measured from `CreatedDate`, so time
   spent waiting for the connector's own capacity counts against the provider's budget.
-* **Result of the age-cap run:** __E1B_RESULT__
+* **Result of the age-cap run [M]:** 300 due jobs were created at 07:22:53 and left to the
+  installed schedule. 240 were processed between 07:25 and 08:20 (20 per sweep). The last
+  60, processed at the 08:25, 08:30 and 08:35 sweeps, ended **Timed Out**
+  (`POLLING_TIMEOUT`) without ever being attempted, because each was already more than 60
+  minutes old when its turn came. These jobs would otherwise have failed at the first step
+  (missing file), so the cap, not the work, decided their outcome. A real document needs
+  more executions than these one-step jobs, so more of a large upload is affected than here.
+* **Ordering makes it worse under sustained load.** `selectNextAutomatic` sorts
+  `Next_Attempt_At__c ASC NULLS FIRST`, so never-attempted jobs always go ahead of due
+  polls. A steady stream of new uploads therefore delays the polls of earlier documents,
+  which compounds the age-cap effect. [C]
 * **Classification:** a scalability limitation with a user-visible consequence
   (spurious **Timed Out**, recoverable with **Try again**, which reconnects to the same
   provider job). Not data loss. Not stated in the documentation today.
@@ -295,10 +318,10 @@ core behaves.
   * *Does the API response accurately represent the outcome?* For the Lightning job page,
     yes: `refreshJob` and `resumeJob` act on one job in a fresh transaction with the full
     50-Queueable allowance, so "requested" is accurate. [C]
-  * *Can work be silently lost?* **Recover: no.** Skipped jobs are still `Queued` or
-    `Processing`, and the sweep finds them. In a live test, 60 jobs recovered in one call
-    started exactly 50 Queueables, and every one of the 60, including the 10 over the
-    limit, was processed. [M] **Refresh: yes, in a bounded sense.** `Review Required`
+  * *Can work be silently lost?* **Recover: no, while the recovery schedule runs.**
+    Skipped jobs are still `Queued` or `Processing`, and the sweep finds them. In the 1.0.3
+    release run, 60 jobs recovered in one call started exactly 50 Queueables, and every one
+    of the 60, including the 10 over the limit, was processed. [M] **Refresh: yes, in a bounded sense.** `Review Required`
     is deliberately excluded from automatic work, so a skipped refresh is never retried
     by the machinery.
   * *Does Review Required behave differently?* Yes: no automatic polling, no sweep, and
@@ -324,9 +347,10 @@ core behaves.
   show the owner, whether that user is active, or the next fire time. After D1 it does
   report work that nobody started. [C]
 * **Not verified [U]:** what the platform does with a schedule whose owner is deactivated
-  or frozen. A test needed to schedule jobs as a second user, which this review's harness
-  refused (it required enabling "administrators can log in as any user" in the org). The
-  recommendation does not depend on the answer: show owner and activity either way.
+  or frozen. Testing it meant scheduling jobs as a second user, which required letting an
+  administrator log in as another user in the org. The session's permission guard declined
+  that setting change, so it was not attempted by another route. The recommendation does
+  not depend on the answer: show owner and activity either way.
 * **Also verified [M]:** Apex cron expressions need integer seconds and minutes
   (`0 0/2 * * * ?` was rejected with *Seconds and minutes must be specified as
   integers*). That is why five-minute cadence takes twelve separate hourly schedules, using
@@ -339,10 +363,11 @@ core behaves.
 
 * **Where:** `SfdcDcx_HttpProviderGateway.send` catches every `CalloutException` as
   `PROVIDER_TIMEOUT`.
-* **Facts [M]:** with the key removed, a callout fails locally with *Field
-  SfdcDcx_ProviderAuth.Token does not exist*, nothing is sent, and the job's message reads
-  "Provider temporarily unavailable. Retry is bounded". It then retries until the budget
-  ends as Timed Out. [recovery](recovery.md) documents this and points to **Test
+* **Facts:** with the key removed, a callout fails locally with *Field
+  SfdcDcx_ProviderAuth.Token does not exist* and nothing is sent [M] (observed on an
+  org where the credential bootstrap had been reset). The gateway then returns the same
+  transient result as a network timeout, so the job's message reads "Provider temporarily
+  unavailable. Retry is bounded" and it retries until the budget ends as Timed Out [C]. [recovery](recovery.md) documents this and points to **Test
   connection**, which classifies it correctly (`NO_CREDENTIAL`).
 * **Classification:** a documented operational limitation, not a defect. The job page
   gives the user the wrong first hint.
@@ -387,7 +412,8 @@ Decisions that are correct or defensible. None needs action.
 10. **Imperative Apex rather than Lightning Data Service** for jobs, labels, results and
     mapping previews: they are Apex-shaped, user-mode DTOs, and background Queueables
     change them, so polling is needed either way. [R]
-11. **A source-distributed install** with `provider-config/` kept out of the upgrade path. Verified: an upgrade preserves a custom Basic-auth credential
+11. **A source-distributed install** with `provider-config/` kept out of the upgrade path.
+    Verified: an upgrade preserves a custom Basic-auth credential
     ([testing](testing.md#recorded-runtime-and-upgrade-run-103-8-october-2026)).
 12. **Insider cost exposure is bounded only by the provider's quota.** **Process again**
     creates a new billable job each time, and no Salesforce-side quota exists. Reasonable
@@ -395,8 +421,8 @@ Decisions that are correct or defensible. None needs action.
 
 # Scalability
 
-Proven limits versus assumption. Workloads of 100, 1,000, 10,000 and 100,000 jobs were
-all below the measured range except where stated.
+Proven limits versus assumption. The workload table below states, for each requested
+size, whether it was measured, interpolated or extrapolated.
 
 **What was actually tested [M].** One Developer-edition scratch org was loaded with
 synthetic jobs (95% Completed with a small result, the rest Failed, Timed Out, Review
@@ -420,11 +446,11 @@ affected, so the absence of an exception here is an observation, not a guarantee
 
 | Workload | Assessment | Class |
 |---|---|---|
-| 100 jobs | Everything instantaneous. | n/a |
+| 100 jobs | Not timed separately. Bounded by the 100,000-row measurement: a smaller table cannot be slower. | n/a |
 | 1,000 | Same. | n/a |
-| 10,000 | Same. Interpolated between 40,000-row plans and the 100,000-row timings, not run separately. | n/a |
-| 100,000 | Measured: under 250 ms for every query. | Fine |
-| 250,000 | Measured: under 0.5 s. The two unindexed text lookups roughly doubled with row count (linear). | Performance risk, low |
+| 10,000 | Same. At 40,000 rows the optimizer's plans were cheap table scans (relative cost under 1). | n/a |
+| 100,000 | **Measured:** every query 5–240 ms. | Fine |
+| 250,000 | **Measured:** every query about 0.5 s or less (largest 503 ms). The two unindexed text lookups roughly doubled with row count (linear). | Performance risk, low |
 | 1,000,000+ | **Extrapolated, not tested.** The two unindexed lookups (by source record, by source file) would be about 2 s and run on every record-page view and every 8 s poll. | Optimization that should wait for usage evidence |
 
 * **The 200-row list limit, the 1,000-row latest-job lookup and the bounded counts** are
@@ -440,6 +466,9 @@ affected, so the absence of an exception here is an observation, not a guarantee
 * **Record locking.** One `FOR UPDATE` per execution, held for the length of one DML. A
   lock conflict with a user editing the same row raises an unhandled error and the sweep
   retries; no scenario was found where it persists, except through R1.
+* **Sort stability.** The workspace lists sort by `CreatedDate DESC` (files by
+  `LastModifiedDate DESC`) with no secondary key, so rows created within the same second
+  can swap places between refreshes. Cosmetic; there is no pagination for it to break. [C]
 * **Mixed-object DML** is correct since 1.0.3: one statement per object type, at most ten.
 * **Governor limits per transaction** were measured for the 25-file submission in the
   1.0.3 release run: 4 queries, 51 query rows, 1 DML, 1 Queueable, no callouts.
@@ -492,6 +521,7 @@ Can a subscriber administrator find and fix problems without reading Apex?
 | Why did this job stop? | Error code with guidance, attempt count, provider job ID, correlation ID, Diagnostics section | misleading first hint for missing credentials (R5) |
 | Is the provider reachable and authorized? | **Test connection** with distinct outcomes | none |
 | Support hand-off | `X-Correlation-Id` is sent to the provider and stored on the job | none |
+| Which version runs here? | nothing in the org: only `apiVersion` appears in metadata, so a source install cannot answer "what version are you on?" | no in-org version indicator (R12) |
 | Capacity | idle cost is 288 scheduled executions a day and no Queueables | no stated throughput envelope (R2) |
 | Alerts | none built in | use standard Salesforce tools: reports and subscriptions, or a scheduled Flow on Needs Attention. Do not build a monitoring platform |
 
@@ -514,7 +544,8 @@ Other operational notes:
 
 A delegated read-only reviewer read all nine bundles, ran the existing Jest suite and
 about fifteen throw-away probes, and reported the items below. I re-read the code behind
-every item I rely on (marked in [D5](#d5-lower-severity-lightning-web-component-defects-open)).
+the items marked *re-read* in [D5](#d5-lower-severity-lightning-web-component-defects-open);
+the others rest on the reviewer's report.
 Nothing was rendered in a browser, so contrast and screen-reader statements come from the
 CSS and markup.
 
@@ -602,6 +633,7 @@ Ordered by severity, then likelihood, user impact and effort.
 | R8 | Retention guidance and a scheduled-Flow example; state that nobody has Delete by default | Low–Medium | Certain over time | Medium | Small | Documentation |
 | R10 | Sandbox refresh checklist | Low | Medium | Medium | Small | Documentation |
 | R11 | Indexes on `Source_Record_Id__c` and `Source_File_Id__c` when a subscriber exceeds about 500,000 jobs | Low | Low | Low | Small | Schema, wait for evidence |
+| R12 | Show the installed version on the Configuration page (a constant or custom label set at release) | Low | Certain over time | Low | Small | Additive UI |
 
 # Explicitly not recommended
 
@@ -702,7 +734,7 @@ No test was added merely for coverage. The three added tests each protect a prov
 | Python suites | 71 of 71 (11 + 9 + 51) |
 | `npm run lint`, `format:check` | exit 0 |
 | Code Analyzer required gate (Recommended 1–2, Security and Performance 1–3) | exit 0 |
-| Secret scan (gitleaks) | see the publishing note in the change record |
+| Secret scan (gitleaks, the CI image, full git history) | no leaks found, 24 commits scanned |
 
 ## Experiments
 
@@ -711,11 +743,12 @@ No test was added merely for coverage. The three added tests each protect a prov
 | Backlog drain by the real schedule | Enterprise scratch | 20 jobs per sweep, about 3 s per chained execution |
 | Chain depth | Enterprise and Developer scratch | Enterprise: 20, then `AsyncException: Maximum stack depth has been reached`. Developer: at least 14, no stop |
 | Head-of-line blocking | Enterprise scratch | 1 poison + 10 healthy: three consecutive failed sweeps (07:50, 07:55, 08:00), healthy jobs untouched |
-| 300-job backlog and the 60-minute cap | Enterprise scratch | __E1B_RESULT__ |
+| 300-job backlog and the 60-minute cap | Enterprise scratch | 240 processed in 57 minutes; the last 60 (20%) ended Timed Out unattempted at the 08:25–08:35 sweeps |
 | Scale 100,000 and 250,000 rows | Developer scratch | timings and plans in [Scalability](#scalability) |
 | Bulk refresh ordering | Developer scratch | Id order for three input orders; newest 10 of 60 outside the first 50 |
 | Cron expression constraint | Enterprise scratch | `0 0/2 * * * ?` rejected: *Seconds and minutes must be specified as integers* |
 | Finalizer primitive | Enterprise scratch | parent DML rolled back; finalizer DML committed with `UNHANDLED_EXCEPTION` |
+| Head-of-line mitigation prototype | Enterprise scratch (same poison scenario) | poison job failed once; 10 healthy jobs reached a final state within 6 s in the same sweep |
 | Missing credential callout | upgrade-test org | *Field SfdcDcx_ProviderAuth.Token does not exist* before anything is sent |
 | Uninstall | Developer scratch with 250,000 jobs | fails at the active page; succeeds after the override reset |
 
@@ -727,9 +760,9 @@ No test was added merely for coverage. The three added tests each protect a prov
   first step; the end-to-end figure for a real document is a projection from that.
 * **Enterprise and Developer scratch orgs only.** Production orgs, other editions, large
   sandboxes and trial orgs may differ.
-* **Not tested because the harness refused the privilege change** (letting an administrator
-  log in as another user): the behavior of a schedule whose owner is deactivated or frozen,
-  and the live behavior of a user without Provider Access.
+* **Not tested because the session's permission guard declined the setting change** (letting
+  an administrator log in as another user): the behavior of a schedule whose owner is
+  deactivated or frozen, and the live behavior of a user without Provider Access.
 * **Synthetic data, one dataset shape.** The 250,000 rows share a creation window and a
   small set of source IDs.
 * **The browser Setup route for uninstall** could not be confirmed.
