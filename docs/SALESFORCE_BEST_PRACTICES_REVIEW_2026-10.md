@@ -306,9 +306,14 @@ core behaves.
   batches matter, let each sweep start a few chains (each from a different due job)
   instead of one. Do not raise `MAX_CHAIN_DEPTH` alone: the cap exists to bound runaway
   chains.
-* **Doc accuracy:** [recovery](recovery.md) says Developer and trial orgs limit chain
-  depth. A Developer-edition scratch org ran a probe chain at least 14 deep and was still
-  going. The statement may hold for real trial orgs; it was not reproduced. [U]
+* **Doc accuracy (corrected):** [recovery](recovery.md) says Developer and trial orgs limit
+  chain depth. That is true of the platform *default*: a probe chain that set no
+  `AsyncOptions` stopped at depth 5 with `AsyncException: Maximum stack depth has been
+  reached`, in an Enterprise-edition scratch org as well. The connector sets
+  `MaximumQueueableStackDepth = 20` on every chain it starts, and that was honored (20
+  deep in the Enterprise org, at least 14 observed in the Developer org). A continuation
+  enqueued from a finalizer is not part of its parent's chain: it started again at depth 1
+  with no maximum. [M]
 
 ## R3. Bulk Refresh and Recover are best effort, silent and not fair
 
@@ -741,7 +746,7 @@ No test was added merely for coverage. The three added tests each protect a prov
 | Experiment | Org | Result |
 |---|---|---|
 | Backlog drain by the real schedule | Enterprise scratch | 20 jobs per sweep, about 3 s per chained execution |
-| Chain depth | Enterprise and Developer scratch | Enterprise: 20, then `AsyncException: Maximum stack depth has been reached`. Developer: at least 14, no stop |
+| Chain depth | Enterprise and Developer scratch | With `MaximumQueueableStackDepth = 20`: Enterprise 20, then `AsyncException: Maximum stack depth has been reached`; Developer at least 14, no stop. With no option set: stopped at 5 |
 | Head-of-line blocking | Enterprise scratch | 1 poison + 10 healthy: three consecutive failed sweeps (07:50, 07:55, 08:00), healthy jobs untouched |
 | 300-job backlog and the 60-minute cap | Enterprise scratch | 240 processed in 57 minutes; the last 60 (20%) ended Timed Out unattempted at the 08:25–08:35 sweeps |
 | Scale 100,000 and 250,000 rows | Developer scratch | timings and plans in [Scalability](#scalability) |
