@@ -454,7 +454,13 @@ public without sharing class SfdcDcx_ProcessingService {
         ? System.now()
         : null;
       change.Next_Attempt_At__c = null;
-      if (shouldReleaseSubmissionOwnership(resultingState, provider, current))
+      if (
+        shouldReleaseSubmissionOwnership(
+          resultingState,
+          change.Error_Code__c,
+          current
+        )
+      )
         change.Submission_Key__c = null;
     } else {
       change.Next_Attempt_At__c = System.now().addMinutes(delay);
@@ -634,9 +640,15 @@ public without sharing class SfdcDcx_ProcessingService {
       job.Error_Code__c == 'IDEMPOTENCY_CONFLICT';
   }
 
+  /**
+   * errorCode is the code the Domain stored for this transition (REMOTE_JOB_FAILED and
+   * REMOTE_JOB_CANCELLED exist only there, never on the provider response), so a
+   * provider-confirmed end seen on a poll releases the identity like one in the
+   * submit response.
+   */
   private static Boolean shouldReleaseSubmissionOwnership(
     String resultingState,
-    SfdcDcx_ProviderResponse provider,
+    String errorCode,
     SfdcDcx_Processing_Job__c current
   ) {
     if (
@@ -646,18 +658,18 @@ public without sharing class SfdcDcx_ProcessingService {
     )
       return false;
     if (resultingState == 'Cancelled')
-      return provider.errorCode == 'REMOTE_JOB_CANCELLED' ||
+      return errorCode == 'REMOTE_JOB_CANCELLED' ||
         String.isBlank(current.Provider_Job_Id__c);
     if (resultingState != 'Failed')
       return false;
     if (
-      provider.errorCode == 'INVALID_PROVIDER_RESPONSE' ||
-      provider.errorCode == 'IDEMPOTENCY_CONFLICT'
+      errorCode == 'INVALID_PROVIDER_RESPONSE' ||
+      errorCode == 'IDEMPOTENCY_CONFLICT'
     )
       return false;
     if (
       !String.isBlank(current.Provider_Job_Id__c) &&
-      provider.errorCode != 'REMOTE_JOB_FAILED'
+      errorCode != 'REMOTE_JOB_FAILED'
     )
       return false;
     return true;
