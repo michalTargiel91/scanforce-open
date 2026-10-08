@@ -45,7 +45,7 @@ TARGETS = [
 
 
 class CodeAnalyzerGateTest(unittest.TestCase):
-    def run_script(self, *arguments, fail="", crash="", sfge_log=None):
+    def run_script(self, *arguments, fail="", crash="", sfge_log=None, github=False):
         with tempfile.TemporaryDirectory() as directory:
             tmp = Path(directory)
             if sfge_log is None:
@@ -67,7 +67,12 @@ class CodeAnalyzerGateTest(unittest.TestCase):
                 "FAKE_FAIL": fail,
                 "FAKE_CRASH": crash,
             }
+            # The script prints annotations instead of plain messages on a runner; a test must not
+            # depend on where it runs.
             env.pop("GITHUB_STEP_SUMMARY", None)
+            env.pop("GITHUB_ACTIONS", None)
+            if github:
+                env["GITHUB_ACTIONS"] = "true"
             env["FAKE_SFGE_LOG"] = str(sfge_log)
             report_dir = tmp / "reports"
             command = ["bash", "scripts/code-analyzer.sh", *arguments]
@@ -172,6 +177,17 @@ class CodeAnalyzerGateTest(unittest.TestCase):
             self.assertIn("SCANNER EXECUTION ERROR", run.stderr, scan)
             self.assertIn("no readable report", run.stderr, scan)
             self.assertEqual(len(calls), 6, "later scans must still run")
+
+    def test_on_a_runner_errors_and_limitations_become_annotations(self):
+        run, _, _, _ = self.run_script("audit", crash="cpd", github=True)
+        self.assertEqual(run.returncode, 1)
+        self.assertIn("::error title=Code Analyzer scanner execution error::cpd: no readable report", run.stdout)
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "sfca-2026_10_08_00_00_00_000.log"
+            log.write_text("[t] Error sfge - Internal execution error while scanning entry point: /r/A.cls:1:1: x\n")
+            run, _, _, _ = self.run_script("audit", sfge_log=log, github=True)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("::warning title=Code Analyzer advisory::", run.stdout)
 
     def test_an_unreadable_graph_engine_log_is_not_a_clean_analysis(self):
         run, _, _, limitations = self.run_script("audit", sfge_log="missing")

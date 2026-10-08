@@ -8,6 +8,14 @@ on:
   schedule:
     - cron: "23 5 * * 1"
   workflow_dispatch:
+  # Only a change to the audit itself triggers it on a pull request (a workflow that is not
+  # on the default branch yet cannot be dispatched by hand, and the audit's own changes
+  # should be exercised on a runner before they merge). It is not a required check.
+  pull_request:
+    paths:
+      - scripts/code-analyzer.sh
+      - code-analyzer.yml
+      - .github/workflows/code-quality-audit.yml
 permissions:
   contents: read
 
