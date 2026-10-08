@@ -181,6 +181,34 @@ Recorded for 1.0.2 (October 2026): Bearer (shipped formula), raw key in
 Basic (parameters entered through the Setup UI) all authenticated; OAuth 2.0
 client credentials and mutual TLS were not tested.
 
+### Recorded runtime and upgrade run (1.0.3, 8 October 2026)
+
+Two disposable API 67 scratch orgs, synthetic data only, deleted afterwards.
+
+* Clean install of the release candidate (`scripts/validate-scratch.sh`): 146 of 146 Apex
+  tests passed, 92% test-run coverage and 91% org-wide. A live 25-file submission used
+  4 queries, 51 query rows, 1 DML statement, 1 Queueable and no callouts; submitting the
+  same 25 files again returned the same 25 job IDs and created none. Recovering and
+  refreshing 60 jobs each started exactly 50 Queueables (the limit) without an exception,
+  and every one of the 60 recovered jobs, including the 10 beyond the limit, was
+  processed by the Queueable chain and the recovery schedule.
+* The same three scripts against a real 1.0.2 installation reproduced the defects:
+  `System.LimitException: Too many queueable jobs added to the queue: 51` for Recover and
+  for Refresh, and `System.TypeException: Cannot have more than 10 chunks in a single
+  operation` for twelve Account and Contact jobs applied in one call.
+* Upgrade from 1.0.2 with `install.sh` (default credential handling, `RunLocalTests`,
+  `--allow-pending-jobs`): five jobs in four states, their source files and file links,
+  the settings record, twelve recovery schedules, permission set assignments, field
+  mappings and 43 retrieved metadata files (permission sets, custom permissions, objects,
+  fields, validation rule, mappings, Named and External Credential) were identical
+  before and after. A custom HTTP Basic formula and the stored principal keep working
+  (`callout:SfdcDcx_Provider` returned 200). The installer reported *Provider credential
+  already exists; leaving its endpoint and secret untouched.* Afterwards the mixed-object
+  apply succeeded, a pre-existing Processing job resumed on the new code, and mappings
+  applied through the 1.0.2 jobs' source associations. As a control, deploying
+  `provider-config/` by hand reset the formula to Bearer and the URL to the placeholder,
+  and the same comparison caught it.
+
 ### Recorded public-HTTPS run (1.0.2, 7 October 2026)
 
 The reference provider, built from the repository's Dockerfile, ran on a temporary Railway

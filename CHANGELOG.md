@@ -3,13 +3,24 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.3 — 2026-10-08
 
-Result of a Salesforce engineering-quality audit with Salesforce Code Analyzer v5, PMD, the
-Graph Engine, Flow Scanner, ESLint, ApexGuru (Basic) and a manual review against platform
-behavior. Two Apex governor-limit defects and two LWC lifecycle defects were reproduced
-with failing tests first and fixed. The architecture, `/connect/v1`, the API version and
-the security model are unchanged.
+Patch release from a Salesforce engineering-quality audit with Salesforce Code Analyzer v5,
+PMD, the Graph Engine, Flow Scanner, ESLint, ApexGuru (Basic) and a manual review against
+platform behavior. Two Apex governor-limit defects and two LWC lifecycle defects were
+reproduced with failing tests first and fixed, and the pull-request quality gate is
+stronger. The architecture, `/connect/v1`, provider neutrality, the API version (67.0),
+the data model, the permission sets and the credential bootstrap are unchanged.
+
+**Upgrading from 1.0.2:** deploy `force-app` again
+(`bash scripts/install.sh --target-org my-org --skip-credentials --allow-pending-jobs`; see
+[upgrading](docs/install.md#upgrading)). Nothing else changes: jobs, source associations,
+field mappings, permission sets, recovery schedules and the Named/External Credential,
+including a custom authentication formula such as HTTP Basic, are kept. Do **not** redeploy
+`provider-config/` over an existing installation. It resets the endpoint and the header
+formula to the placeholders.
+
+This release is not an AppExchange certification or a statement of AppExchange readiness.
 
 ### Fixes
 
@@ -61,6 +72,13 @@ the security model are unchanged.
   limitation is recorded there. The 25-file limits now state the measured query count.
 * The example Flows' README no longer claims an upload can never fail because of processing;
   it says the Flows ship without fault paths.
+* Standing advisory results are recorded with their severity (Flow Scanner:
+  `MissingFaultHandler` is severity 2 / High, `MissingDescription` severity 4 / Low; Graph
+  Engine: six Moderate findings, all false positives with a written reason, and two entry
+  points it cannot analyze) in [testing](docs/testing.md).
+* A manual `provider-config/` redeploy over an existing installation is called out as the
+  one way to reset credentials; the troubleshooting guide covers the source-tracking
+  conflict that scratch orgs and Developer sandboxes can show on an upgrade.
 
 ## 1.0.2 — 2026-10-07
 
