@@ -15,6 +15,19 @@ public with sharing class SfdcDcx_RecordLabels {
     public Boolean accessible = false;
   }
 
+  /**
+   * The object type of a record ID, or null when its key prefix belongs to no object in
+   * this org (an ID from another org, a deleted custom object, an uninstalled package).
+   * Id.getSObjectType() throws for those; callers treat null as "not available".
+   */
+  public static Schema.SObjectType objectTypeOf(Id recordId) {
+    try {
+      return recordId.getSObjectType();
+    } catch (SObjectException unknownPrefix) {
+      return null;
+    }
+  }
+
   public static Map<Id, Label> resolve(Set<String> rawIds) {
     Map<Id, Label> labels = new Map<Id, Label>();
     Map<Schema.SObjectType, Set<Id>> byType = new Map<Schema.SObjectType, Set<Id>>();
@@ -22,7 +35,14 @@ public with sharing class SfdcDcx_RecordLabels {
       Id recordId = toId(raw);
       if (recordId == null)
         continue;
-      Schema.SObjectType objectType = recordId.getSObjectType();
+      Schema.SObjectType objectType = objectTypeOf(recordId);
+      if (objectType == null) {
+        Label unknown = new Label();
+        unknown.recordId = recordId;
+        unknown.objectLabel = 'Unknown';
+        labels.put(recordId, unknown);
+        continue;
+      }
       Schema.DescribeSObjectResult describe = objectType.getDescribe();
       Label label = new Label();
       label.recordId = recordId;

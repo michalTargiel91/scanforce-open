@@ -280,6 +280,35 @@ private class SfdcDcx_ApiTest {
     );
   }
 
+  // submitAll promises per-item outcomes, never a thrown batch failure: a well-formed ID
+  // whose key prefix belongs to no object in this org (for example one from another org
+  // or from a deleted custom object) is just another inaccessible source record.
+  @IsTest
+  static void sourceRecordOfUnknownTypeIsRejectedPerItemNotThrown() {
+    System.runAs(SfdcDcx_TestFactory.userByAlias('sfoapi')) {
+      SfdcDcx_Worker.suppressEnqueue = true;
+      ContentVersion file = SfdcDcx_TestFactory.createFile(
+        'unknown-source-type',
+        'pdf',
+        null
+      );
+      SfdcDcx_ProcessingService.SubmitRequest valid = new SfdcDcx_ProcessingService.SubmitRequest();
+      valid.contentVersionId = file.Id;
+      SfdcDcx_ProcessingService.SubmitRequest unknownType = new SfdcDcx_ProcessingService.SubmitRequest();
+      unknownType.contentVersionId = file.Id;
+      unknownType.sourceRecordId = Id.valueOf('000000000000000AAA');
+      SfdcDcx_ProcessingService.SubmitRequest unknownFile = new SfdcDcx_ProcessingService.SubmitRequest();
+      unknownFile.contentVersionId = Id.valueOf('000000000000000AAA');
+      List<SfdcDcx_ProcessingService.SubmitResult> results = SfdcDcx_Api.submitAll(
+        new List<SfdcDcx_ProcessingService.SubmitRequest>{ valid, unknownType }
+      );
+      System.assertEquals(2, results.size());
+      System.assert(results[0].success, 'The valid item is not collateral');
+      System.assertEquals(false, results[1].success);
+      System.assertEquals('SOURCE_RECORD_NOT_ACCESSIBLE', results[1].errorCode);
+    }
+  }
+
   @IsTest
   static void everyEntryPointRequiresThePermission() {
     System.runAs(SfdcDcx_TestFactory.userByAlias('sfodeny')) {

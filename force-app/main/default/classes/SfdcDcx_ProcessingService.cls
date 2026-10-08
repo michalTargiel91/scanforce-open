@@ -147,12 +147,17 @@ public without sharing class SfdcDcx_ProcessingService {
       if (
         request != null &&
         request.contentVersionId != null &&
-        request.contentVersionId.getSObjectType() == ContentVersion.SObjectType
+        SfdcDcx_RecordLabels.objectTypeOf(request.contentVersionId) ==
+        ContentVersion.SObjectType
       )
         inputs.versionIds.add(request.contentVersionId);
       if (request != null && request.sourceRecordId != null) {
         inputs.sourceIds.add(request.sourceRecordId);
-        inputs.sourceTypes.add(request.sourceRecordId.getSObjectType());
+        Schema.SObjectType sourceType = SfdcDcx_RecordLabels.objectTypeOf(
+          request.sourceRecordId
+        );
+        if (sourceType != null)
+          inputs.sourceTypes.add(sourceType);
       }
     }
     return inputs;
@@ -542,7 +547,8 @@ public without sharing class SfdcDcx_ProcessingService {
     if (
       request == null ||
       request.contentVersionId == null ||
-      request.contentVersionId.getSObjectType() != ContentVersion.SObjectType
+      SfdcDcx_RecordLabels.objectTypeOf(request.contentVersionId) !=
+      ContentVersion.SObjectType
     )
       return 'INVALID_CONTENT_VERSION';
     ContentVersion version = versions.get(request.contentVersionId);
