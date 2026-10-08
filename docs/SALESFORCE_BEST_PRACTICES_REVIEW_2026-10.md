@@ -265,6 +265,11 @@ core behaves.
   healthy jobs that had been stuck for over 20 minutes to a final state. The poison job
   stayed `Queued`: here the rule also blocks the finalizer's own update, so its cost is one
   failed execution per sweep.
+* **Status:** implemented as its own change with tests, a full-suite run and a live check
+  of the depth cap in draft pull request #13 (the continuation must carry the parent's
+  remaining depth: a finalizer is not a Queueable, and a continuation enqueued without
+  options restarts at depth 1 with no maximum). The notes below describe the earlier
+  prototype.
 * **Prototype limits:** no tests were written; the retry-budget path (a) was blocked by the
   rule in this scenario and therefore not exercised; finalizer enqueue limits and
   consecutive-failure behavior were not examined. [U] It shows the design is feasible, not
