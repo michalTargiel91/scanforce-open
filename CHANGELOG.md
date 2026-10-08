@@ -19,6 +19,22 @@ No change to the architecture, `/connect/v1` or any public contract.
   selected.
 * The record-page document list keeps refreshing after one failed poll and clears the
   error when the next poll succeeds.
+* **A failed batch no longer hides the batches that were already sent.** Uploading more
+  than 25 files sends them in batches; when a later batch failed, the page showed only the
+  error although earlier batches had created jobs. Every file is now listed, those not sent
+  as *Not submitted* with the reason, and the job list is reloaded.
+* **Polling pauses instead of timing out while a tab is hidden.** The Workspace, record
+  page and job page no longer count hidden time toward the 20-minute idle limit, send
+  nothing while hidden, and refresh as soon as the tab is shown. The job page also ignores
+  a slow response that arrives after a newer one.
+* **No false empty state or failure message.** The Workspace no longer says "No processing
+  jobs" while loading or after a failed load, the record page and Configuration page show a
+  spinner while loading, and a reload that fails after a successful submit no longer
+  reports "Submission failed". A failed preview refresh after a mapping was applied says so
+  instead of reporting the update as failed.
+* **The Configuration page keeps an endpoint you are typing** when Refresh or another
+  action re-reads the status. The job page stops saying it "updates automatically" once the
+  status check has finished, and says when the provider has not changed.
 
 ### Documentation
 

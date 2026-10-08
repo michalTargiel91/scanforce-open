@@ -120,4 +120,29 @@ describe("c-sfdc-dcx-mapping-panel", () => {
       "No active field mappings",
     );
   });
+
+  it("does not report a failed preview refresh as a failed update", async () => {
+    const toasts = [];
+    previewMappings
+      .mockResolvedValueOnce(PREVIEW)
+      .mockRejectedValueOnce({ body: { message: "Preview unavailable" } });
+    applyMappings.mockResolvedValue({ success: true, updatedFields: 2 });
+    const element = createElement("c-sfdc-dcx-mapping-panel", {
+      is: SfdcDcxMappingPanel,
+    });
+    element.jobId = "a01";
+    element.addEventListener("lightning__showtoast", (event) =>
+      toasts.push(event.detail.title),
+    );
+    document.body.appendChild(element);
+    element.shadowRoot.querySelector("lightning-button").click();
+    await settle();
+    Array.from(element.shadowRoot.querySelectorAll("lightning-button"))
+      .find((button) => /^Apply \d+ change/.test(button.label))
+      .click();
+    await settle();
+    expect(toasts).toContain("Record updated");
+    expect(toasts).not.toContain("Record not updated");
+    expect(toasts).toContain("Could not refresh the preview");
+  });
 });

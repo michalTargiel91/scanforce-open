@@ -436,4 +436,90 @@ describe("c-sfdc-dcx-workspace", () => {
     expect(processButton().disabled).toBe(true);
     expect(submitFiles).not.toHaveBeenCalled();
   });
+
+  it("does not claim there are no jobs while they are still loading", async () => {
+    let release;
+    listJobs.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const element = mount();
+    await settle();
+    const listText = () =>
+      element.shadowRoot.querySelector("c-sfdc-dcx-job-list").shadowRoot
+        .textContent;
+    expect(listText()).not.toContain("No processing jobs");
+    release([]);
+    await settle();
+    expect(listText()).toContain("No processing jobs yet");
+  });
+
+  it("does not claim there are no jobs after the list failed to load", async () => {
+    listJobs.mockRejectedValueOnce({ body: { message: "Jobs unavailable" } });
+    const element = mount();
+    await settle();
+    expect(element.shadowRoot.textContent).toContain("Jobs unavailable");
+    expect(
+      element.shadowRoot.querySelector("c-sfdc-dcx-job-list").shadowRoot
+        .textContent,
+    ).not.toContain("No processing jobs");
+  });
+
+  it("keeps waiting while the tab is hidden and refreshes once it is visible again", async () => {
+    let state = "visible";
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => state,
+    });
+    try {
+      mount();
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(1);
+      state = "hidden";
+      for (let minute = 0; minute < 25; minute++) {
+        jest.advanceTimersByTime(60000);
+        // eslint-disable-next-line no-await-in-loop -- each timer step must settle before the next
+        await settle();
+      }
+      expect(listJobs).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(1);
+      state = "visible";
+      jest.advanceTimersByTime(8000);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(2);
+    } finally {
+      delete document.visibilityState;
+    }
+  });
+
+  it("shows which files were sent when a later batch fails", async () => {
+    submitFiles
+      .mockResolvedValueOnce(
+        Array.from({ length: 25 }, (_, index) => ({
+          contentVersionId: `068${index}`,
+          success: true,
+          processingJobId: `a${index}`,
+        })),
+      )
+      .mockRejectedValueOnce({ body: { message: "Network down" } });
+    const element = mount();
+    await settle();
+    const files = Array.from({ length: 30 }, (_, index) => ({
+      name: `f${index}.pdf`,
+      documentId: `069${index}`,
+      contentVersionId: `068${index}`,
+    }));
+    element.shadowRoot
+      .querySelector("lightning-file-upload")
+      .dispatchEvent(new CustomEvent("uploadfinished", { detail: { files } }));
+    await settle();
+    expect(listJobs.mock.calls.length).toBeGreaterThan(1);
+    const text = element.shadowRoot.textContent;
+    expect(text).toContain("f0.pdf");
+    expect(text).toContain("f29.pdf");
+    expect(text).toContain("Not submitted");
+    expect(text).toContain("Network down");
+  });
 });

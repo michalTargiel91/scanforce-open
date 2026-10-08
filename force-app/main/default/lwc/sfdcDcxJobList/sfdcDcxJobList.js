@@ -7,6 +7,10 @@ export default class SfdcDcxJobList extends LightningElement {
   @api emptyMessage = "No processing jobs yet.";
   @api ariaLabel = "Processing jobs";
 
+  get hasEmptyMessage() {
+    return Boolean(this.emptyMessage);
+  }
+
   get hasRows() {
     return Array.isArray(this.rows) && this.rows.length > 0;
   }

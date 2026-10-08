@@ -140,4 +140,25 @@ describe("c-sfdc-dcx-job-state", () => {
     expect(submit.mock.calls[0][0].documentType).toBe("auto");
     expect(results.map((result) => result.contentVersionId)).toEqual(ids);
   });
+
+  it("keeps the outcomes of earlier batches when a later batch fails", async () => {
+    const ids = Array.from({ length: 30 }, (_, index) => `068${index}`);
+    const submit = jest
+      .fn()
+      .mockResolvedValueOnce(
+        ids.slice(0, 25).map((id) => ({ contentVersionId: id, success: true })),
+      )
+      .mockRejectedValueOnce({ body: { message: "Network down" } });
+    const results = await submitInBatches(submit, ids, 25, {});
+    expect(results).toHaveLength(30);
+    expect(results.slice(0, 25).every((result) => result.success)).toBe(true);
+    const failed = results.slice(25);
+    expect(failed.map((result) => result.contentVersionId)).toEqual(
+      ids.slice(25),
+    );
+    expect(failed.every((result) => !result.success)).toBe(true);
+    expect(failed[0].errorCode).toBe("SUBMISSION_FAILED");
+    expect(failed[0].errorMessage).toBe("Network down");
+    expect(errorInfo("SUBMISSION_FAILED").title).toBe("Not submitted");
+  });
 });

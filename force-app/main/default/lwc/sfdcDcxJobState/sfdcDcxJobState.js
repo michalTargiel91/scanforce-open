@@ -298,6 +298,12 @@ const ERRORS = {
     detail: "Submit at most 25 files at a time.",
     audience: USER,
   },
+  SUBMISSION_FAILED: {
+    title: "Not submitted",
+    detail:
+      "The request failed before this file was sent. Check the jobs list and try these files again.",
+    audience: USER,
+  },
   TOO_MANY_SOURCE_OBJECT_TYPES: {
     title: "Too many record types",
     detail: "Submit files for at most 10 kinds of records at once.",
@@ -330,6 +336,8 @@ const ACTION_MESSAGES = {
   RESUME_REQUESTED: "Processing resumed with the original provider identity.",
   NOT_DUE: "The next automatic attempt is already scheduled.",
   NOT_ACTIVE: "This job is no longer in progress.",
+  REFRESH_NO_CHANGE:
+    "No change from the provider yet. Choose Check review status to look again.",
   SUBMITTED: "Submitted.",
   NOT_RETRYABLE: "Only failed, cancelled or timed-out jobs can be tried again.",
   NOT_COMPLETED: "Only completed jobs can be processed again.",
@@ -487,14 +495,39 @@ export function chunk(items, size) {
   return chunks;
 }
 
-/** Submit IDs in sequential batches and return all outcomes in order. */
+/** One SUBMISSION_FAILED outcome for every file in the batches that were not sent. */
+function unsentOutcomes(batches, message) {
+  return batches.flat().map((contentVersionId) => ({
+    contentVersionId,
+    success: false,
+    errorCode: "SUBMISSION_FAILED",
+    errorMessage: message,
+  }));
+}
+
+/**
+ * Submit IDs in sequential batches and return all outcomes in order. When a batch
+ * fails, earlier batches have already created jobs, so their outcomes are kept and
+ * every file that was not sent is reported as SUBMISSION_FAILED instead of throwing.
+ */
 export async function submitInBatches(submit, ids, size, request) {
   let outcomes = [];
-  for (const batch of chunk(ids, size)) {
-    // Sequential on purpose: each call is one authorised, bounded transaction.
-    // eslint-disable-next-line no-await-in-loop -- batches must not overlap
-    const results = await submit({ ...request, contentVersionIds: batch });
-    outcomes = outcomes.concat(results);
+  const batches = chunk(ids, size);
+  for (let index = 0; index < batches.length; index++) {
+    try {
+      // Sequential on purpose: each call is one authorised, bounded transaction.
+      // eslint-disable-next-line no-await-in-loop -- batches must not overlap
+      const results = await submit({
+        ...request,
+        contentVersionIds: batches[index],
+      });
+      outcomes = outcomes.concat(results);
+    } catch (error) {
+      outcomes = outcomes.concat(
+        unsentOutcomes(batches.slice(index), reduceError(error)),
+      );
+      break;
+    }
   }
   return outcomes;
 }

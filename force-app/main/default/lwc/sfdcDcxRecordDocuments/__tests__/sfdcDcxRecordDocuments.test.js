@@ -222,4 +222,102 @@ describe("c-sfdc-dcx-record-documents", () => {
       jest.useRealTimers();
     }
   });
+
+  it("keeps waiting while the tab is hidden and refreshes once it is visible again", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+    let state = "visible";
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => state,
+    });
+    try {
+      getContext.mockResolvedValue({ canSubmit: true, acceptedFormats: [] });
+      listRecordFiles.mockResolvedValue([]);
+      listJobs.mockResolvedValue([
+        { id: "a01", name: "DOC-1", status: "Processing" },
+      ]);
+      const element = createElement("c-sfdc-dcx-record-documents", {
+        is: SfdcDcxRecordDocuments,
+      });
+      element.recordId = "001A";
+      document.body.appendChild(element);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(1);
+      state = "hidden";
+      for (let minute = 0; minute < 25; minute++) {
+        jest.advanceTimersByTime(60000);
+        // eslint-disable-next-line no-await-in-loop -- each timer step must settle before the next
+        await settle();
+      }
+      expect(listJobs).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(1);
+      state = "visible";
+      jest.advanceTimersByTime(8000);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(2);
+    } finally {
+      delete document.visibilityState;
+      jest.useRealTimers();
+    }
+  });
+
+  it("does not report a failed reload as a failed submission", async () => {
+    const toasts = [];
+    getContext.mockResolvedValue({ canSubmit: true, acceptedFormats: [] });
+    listRecordFiles
+      .mockResolvedValueOnce([
+        {
+          contentVersionId: "068A",
+          title: "Invoice",
+          extension: "pdf",
+          size: 1000,
+          supported: true,
+        },
+      ])
+      .mockRejectedValue({ body: { message: "Reload failed" } });
+    listJobs.mockResolvedValue([]);
+    submitFiles.mockResolvedValue([
+      { contentVersionId: "068A", success: true, processingJobId: "a02" },
+    ]);
+    const element = createElement("c-sfdc-dcx-record-documents", {
+      is: SfdcDcxRecordDocuments,
+    });
+    element.recordId = "001A";
+    element.addEventListener("lightning__showtoast", (event) =>
+      toasts.push(event.detail.title),
+    );
+    document.body.appendChild(element);
+    await settle();
+    Array.from(element.shadowRoot.querySelectorAll("lightning-button"))
+      .find((button) => button.label === "Process")
+      .click();
+    await settle();
+    expect(toasts).toContain("Processing started");
+    expect(toasts).not.toContain("Submission failed");
+    expect(element.shadowRoot.textContent).toContain("Reload failed");
+  });
+
+  it("shows a loading indicator until the first load completes", async () => {
+    let release;
+    getContext.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    listRecordFiles.mockResolvedValue([]);
+    listJobs.mockResolvedValue([]);
+    const element = createElement("c-sfdc-dcx-record-documents", {
+      is: SfdcDcxRecordDocuments,
+    });
+    element.recordId = "001A";
+    document.body.appendChild(element);
+    await settle();
+    expect(
+      element.shadowRoot.querySelector("lightning-spinner"),
+    ).not.toBeNull();
+    release({ canSubmit: true, acceptedFormats: [] });
+    await settle();
+    expect(element.shadowRoot.querySelector("lightning-spinner")).toBeNull();
+  });
 });

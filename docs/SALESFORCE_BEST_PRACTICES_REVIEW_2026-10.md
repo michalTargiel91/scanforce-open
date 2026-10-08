@@ -196,22 +196,26 @@ test that fails without the fix (red) and passes with it (green).
   change. Not done here: the verified route is a metadata deployment, which belongs in a
   tested script rather than prose.
 
-## D5. Lower-severity Lightning Web Component defects *(open)*
+## D5. Lower-severity Lightning Web Component defects *(partly fixed)*
 
 All are user-visible but none loses data. "Re-read" means I confirmed the code path.
 
-| ID | Component | Defect | Label | Severity |
-|---|---|---|---|---|
-| A1 | Workspace, Setup | `outline:none` with an identical selected style: a focused, selected tile or card has no visible focus (WCAG 2.4.7) | [R] *re-read* | Low–Medium |
-| A3 | Workspace, RecordDocuments | time with the tab hidden counts toward the 20-minute idle limit and nothing refreshes when the tab returns | [R] *re-read* | Low |
-| A5 | JobDetail | `load()` has no ordering guard; a slow older response can overwrite a newer one and leave no timer (the same class as the workspace race fixed in 1.0.3) | [R] *re-read* | Low |
-| A6 | Workspace | the "No processing jobs yet" text shows while loading and after a failed load | [R] *re-read* | Low |
-| A7 | Setup | grey helper text on the green or orange connection-result banner: computed 1.1–2.1:1 on green and 2.3–4.4:1 on orange with SLDS grey tokens (WCAG 1.4.3). Verify in DevTools | [R] arithmetic re-run | Low–Medium |
-| A8 | Setup | an unsaved endpoint draft is overwritten when Refresh, Install recovery or Grant access re-applies status | [R] *re-read* | Low |
-| A9 | RecordDocuments, MappingPanel | a failing reload after a successful action is reported as a failure of the action ("Submission failed" after "Processing started") | [R] *re-read* (RecordDocuments) | Low |
-| A10 | Workspace, RecordDocuments | with more than one batch, a failure in a later batch hides that earlier batches already created jobs | [R] | Low |
-| A11 | Setup, RecordDocuments | no loading indicator or announcement (0 spinners in either bundle) | [R] *re-read* | Low |
-| A12 | JobDetail | "This page updates automatically" stays after the watch window ends | [R] | Low |
+**Status:** A3, A5, A6 and A8–A12 are fixed in the LWC follow-up pull request, each with a
+Jest test that failed on the unfixed code first. A1 and A7 are open: they are statements
+about rendered pixels, so they need a rendered page, not arithmetic.
+
+| ID | Component | Defect | Label | Severity | Status |
+|---|---|---|---|---|---|
+| A1 | Workspace, Setup | `outline:none` with an identical selected style: a focused, selected tile or card has no visible focus (WCAG 2.4.7) | [R] *re-read* | Low–Medium | Open |
+| A3 | Workspace, RecordDocuments | time with the tab hidden counts toward the 20-minute idle limit and nothing refreshes when the tab returns | [R] *re-read* | Low | Fixed |
+| A5 | JobDetail | `load()` has no ordering guard; a slow older response can overwrite a newer one and leave no timer (the same class as the workspace race fixed in 1.0.3) | [R] *re-read* | Low | Fixed |
+| A6 | Workspace | the "No processing jobs yet" text shows while loading and after a failed load | [R] *re-read* | Low | Fixed |
+| A7 | Setup | grey helper text on the green or orange connection-result banner: computed 1.1–2.1:1 on green and 2.3–4.4:1 on orange with SLDS grey tokens (WCAG 1.4.3). Verify in DevTools | [R] arithmetic re-run | Low–Medium | Open |
+| A8 | Setup | an unsaved endpoint draft is overwritten when Refresh, Install recovery or Grant access re-applies status | [R] *re-read* | Low | Fixed |
+| A9 | RecordDocuments, MappingPanel | a failing reload after a successful action is reported as a failure of the action ("Submission failed" after "Processing started") | [R] *re-read* (RecordDocuments) | Low | Fixed |
+| A10 | Workspace, RecordDocuments | with more than one batch, a failure in a later batch hides that earlier batches already created jobs | [R] | Low | Fixed |
+| A11 | Setup, RecordDocuments | no loading indicator or announcement (0 spinners in either bundle) | [R] *re-read* | Low | Fixed |
+| A12 | JobDetail | "This page updates automatically" stays after the watch window ends | [R] | Low | Fixed |
 
 # Architectural risks
 
@@ -554,7 +558,7 @@ Other operational notes:
 
 A delegated read-only reviewer read all nine bundles, ran the existing Jest suite and
 about fifteen throw-away probes, and reported the items below. I re-read the code behind
-the items marked *re-read* in [D5](#d5-lower-severity-lightning-web-component-defects-open);
+the items marked *re-read* in [D5](#d5-lower-severity-lightning-web-component-defects-partly-fixed);
 the others rest on the reviewer's report.
 Nothing was rendered in a browser, so contrast and screen-reader statements come from the
 CSS and markup.
@@ -639,7 +643,7 @@ Ordered by severity, then likelihood, user impact and effort.
 | R4 | Show schedule owner, owner active state and next fire on the Configuration page; document the installing-user guidance | Low–Medium | Low–Medium | Medium | Small | Additive UI |
 | R9 | Fix the uninstall instructions (D4), ideally with a small tested script | Low–Medium | Certain on uninstall | Low | Small | Docs or script |
 | R5 | Distinct error code and guidance for "credential or access not usable" | Low | High (first-time setup) | Low | Small | Error code addition |
-| R7 | One shared poller; fix A1, A3, A5, A7, A8, A9–A12 | Low | Medium | Low | Medium | LWC |
+| R7 | Fix A3, A5, A6, A8–A12 (done individually, see D5); one shared poller; A1 and A7 after a rendered check | Low | Medium | Low | Medium | LWC |
 | R8 | Retention guidance and a scheduled-Flow example; state that nobody has Delete by default | Low–Medium | Certain over time | Medium | Small | Documentation |
 | R10 | Sandbox refresh checklist | Low | Medium | Medium | Small | Documentation |
 | R11 | Indexes on `Source_Record_Id__c` and `Source_File_Id__c` when a subscriber exceeds about 500,000 jobs | Low | Low | Low | Small | Schema, wait for evidence |
@@ -725,8 +729,8 @@ Coverage percentage is not the measure. Mapping the invariants to tests:
 | LWC lifecycle | Yes since 1.0.3, extended here | remove, re-add, out-of-order, failed poll |
 | **An exception inside `process()` does not stall other jobs** | **No** | would have caught R1 |
 | **Configuration status metrics** | **No before this review** | D1 now covered |
-| **JobDetail response ordering** | **No** | A5 |
-| **Hidden-tab accounting in polling** | **No** | A3 |
+| JobDetail response ordering | Yes, in the LWC follow-up | A5 |
+| Hidden-tab accounting in polling | Yes, in the LWC follow-up | A3 |
 | **Flow examples** | Not at all (static scan only) | acceptable for Draft examples |
 
 No test was added merely for coverage. The three added tests each protect a proven defect.

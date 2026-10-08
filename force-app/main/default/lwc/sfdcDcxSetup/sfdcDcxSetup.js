@@ -49,6 +49,7 @@ export default class SfdcDcxSetup extends NavigationMixin(LightningElement) {
   busy = false;
   selectedKind;
   endpointInput = "";
+  endpointDirty = false;
   apiKeyInput = "";
   connection;
 
@@ -71,11 +72,19 @@ export default class SfdcDcxSetup extends NavigationMixin(LightningElement) {
       this.selectedKind =
         status.providerKind === "unconfigured" ? null : status.providerKind;
     }
+    // An endpoint the administrator has typed but not saved is theirs until they save it.
+    if (this.endpointDirty) {
+      return;
+    }
     if (status.endpoint && status.endpoint.ready) {
       this.endpointInput = status.endpoint.url;
     } else if (this.selectedKind === "docsolved") {
       this.endpointInput = status.docSolvedEndpoint;
     }
+  }
+
+  get showSpinner() {
+    return this.busy || (!this.status && !this.loadError);
   }
 
   get readinessClass() {
@@ -138,6 +147,7 @@ export default class SfdcDcxSetup extends NavigationMixin(LightningElement) {
 
   chooseProvider(event) {
     this.selectedKind = event.currentTarget.dataset.kind;
+    this.endpointDirty = false;
     if (this.selectedKind === "docsolved") {
       this.endpointInput = this.status.docSolvedEndpoint;
     } else if (this.status.providerKind !== "custom") {
@@ -215,6 +225,7 @@ export default class SfdcDcxSetup extends NavigationMixin(LightningElement) {
 
   handleEndpointInput(event) {
     this.endpointInput = event.detail.value;
+    this.endpointDirty = true;
   }
 
   /** Origin (scheme, host, port) of an endpoint URL, or null. */
@@ -269,6 +280,7 @@ export default class SfdcDcxSetup extends NavigationMixin(LightningElement) {
         this.connection = undefined;
       }
       await saveEndpoint({ url });
+      this.endpointDirty = false;
       this.applyStatus(await getStatus());
       this.connection = undefined;
       this.toast(

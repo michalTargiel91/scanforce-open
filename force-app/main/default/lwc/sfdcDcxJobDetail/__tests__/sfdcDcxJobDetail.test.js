@@ -318,4 +318,111 @@ describe("c-sfdc-dcx-job-detail", () => {
       jest.useRealTimers();
     }
   });
+
+  it("ignores a slower, older response that arrives after a newer one", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+    try {
+      getJob.mockResolvedValue({
+        ...BASE,
+        status: "Processing",
+        due: true,
+        actions: { ...BASE.actions, canResume: true },
+      });
+      const element = mount();
+      await settle();
+      let releaseStale;
+      getJob.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseStale = resolve;
+          }),
+      );
+      jest.advanceTimersByTime(6000);
+      await settle();
+      resumeJob.mockResolvedValue({
+        accepted: true,
+        code: "RESUME_REQUESTED",
+        processingJobId: BASE.id,
+      });
+      getJob.mockResolvedValueOnce({
+        ...BASE,
+        status: "Completed",
+        result: RESULT,
+      });
+      button(element, "Resume processing").click();
+      await settle();
+      const step = () =>
+        element.shadowRoot.querySelector("lightning-progress-indicator")
+          .currentStep;
+      expect(step()).toBe("completed");
+      releaseStale({ ...BASE, status: "Review Required", result: RESULT });
+      await settle();
+      expect(step()).toBe("completed");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("stops promising automatic updates once the watch window has ended", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+    try {
+      getJob.mockResolvedValue({
+        ...BASE,
+        status: "Review Required",
+        result: RESULT,
+        actions: { ...BASE.actions, canRefresh: true },
+      });
+      refreshJob.mockResolvedValue({
+        accepted: true,
+        code: "REFRESH_REQUESTED",
+        processingJobId: BASE.id,
+      });
+      const element = mount();
+      await settle();
+      button(element, "Check review status").click();
+      await settle();
+      expect(element.shadowRoot.textContent).toContain("updates automatically");
+      for (let poll = 0; poll < 12; poll++) {
+        jest.advanceTimersByTime(6000);
+        // eslint-disable-next-line no-await-in-loop -- each timer step must settle before the next
+        await settle();
+      }
+      expect(jest.getTimerCount()).toBe(0);
+      expect(element.shadowRoot.textContent).not.toContain(
+        "updates automatically",
+      );
+      expect(element.shadowRoot.textContent).toContain("No change");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("does not poll the server while the tab is hidden", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+    let state = "visible";
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => state,
+    });
+    try {
+      getJob.mockResolvedValue({ ...BASE, status: "Processing" });
+      mount();
+      await settle();
+      expect(getJob).toHaveBeenCalledTimes(1);
+      state = "hidden";
+      for (let poll = 0; poll < 20; poll++) {
+        jest.advanceTimersByTime(6000);
+        // eslint-disable-next-line no-await-in-loop -- each timer step must settle before the next
+        await settle();
+      }
+      expect(getJob).toHaveBeenCalledTimes(1);
+      state = "visible";
+      jest.advanceTimersByTime(6000);
+      await settle();
+      expect(getJob).toHaveBeenCalledTimes(2);
+    } finally {
+      delete document.visibilityState;
+      jest.useRealTimers();
+    }
+  });
 });
