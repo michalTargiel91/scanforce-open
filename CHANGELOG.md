@@ -3,6 +3,31 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Result of an independent Salesforce best-practices review; findings, evidence and
+recommendations are in the [review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md).
+No change to the architecture, `/connect/v1` or any public contract.
+
+### Fixes
+
+* The Configuration page's **overdue** count now includes jobs nobody has started yet
+  (their `Next_Attempt_At__c` is empty), the case [recovery](docs/recovery.md) describes: a
+  Queued job older than 15 minutes with no recovery schedule used to raise no warning.
+* The Workspace file picker forgets its selection when a search or refresh rebuilds the
+  table, so "Process 1 selected" can no longer submit a file the table no longer shows as
+  selected.
+* The record-page document list keeps refreshing after one failed poll and clears the
+  error when the next poll succeeds.
+
+### Documentation
+
+* Uninstalling: the delete stops at the active record page; the install guide now says how
+  to release it (verified with 250,000 job records present).
+* New [best-practices review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md): measured
+  backlog throughput, a demonstrated head-of-line-blocking risk, query timings at 100,000
+  and 250,000 jobs, the bulk Refresh and Recover behavior, and prioritized recommendations.
+
 ## 1.0.3 — 2026-10-08
 
 Patch release from a Salesforce engineering-quality audit with Salesforce Code Analyzer v5,

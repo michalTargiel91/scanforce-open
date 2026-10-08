@@ -115,6 +115,13 @@ are queued, deploy, and install the schedule again.
    `sf project delete source --target-org my-org --source-dir force-app` (and
    `provider-config` if you no longer need the credentials).
 
+If the delete stops with *You can't delete an active Lightning page*, the job record
+page is still the object's **View** override. The refusal is all-or-nothing, so nothing
+has been removed. Reset that override first (deploying the Document Processing Job
+object with its **View** action set to the default clears it), then run the delete again.
+This was verified with 250,000 job records present; see the
+[best-practices review](SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md#d4-the-documented-uninstall-fails-at-the-active-record-page-open-recipe-verified).
+
 Salesforce Files are never deleted by ScanForce Open.
 
 ## Unlocked package (optional)
