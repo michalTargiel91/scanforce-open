@@ -340,6 +340,41 @@ public without sharing class SfdcDcx_ProcessingService {
     SfdcDcx_AsyncDispatcher.enqueueWork(work);
   }
 
+  /**
+   * Called after process() failed with an exception nothing here could handle (its
+   * transaction is rolled back, so the job looks untouched). Without this the job
+   * would stay the oldest due job and every sweep would pick it first again. It spends
+   * one attempt and backs off like any other retry. Best effort: if something rejects this
+   * write too, the job is simply skipped for the rest of the chain. Nothing changes the
+   * status here, and user-requested refreshes and finished jobs are left alone.
+   */
+  public static void deferAfterFailure(
+    Id jobId,
+    Integer generation,
+    Boolean refreshOnly
+  ) {
+    if (refreshOnly == true)
+      return;
+    SfdcDcx_Processing_Job__c job = SfdcDcx_ProcessingJobSelector.selectById(
+      jobId
+    );
+    if (
+      job == null ||
+      job.Attempt_Count__c != generation ||
+      SfdcDcx_ProcessingJobDomain.isAutomaticStop(job.Status__c)
+    )
+      return;
+    Database.update(
+      new SfdcDcx_Processing_Job__c(
+        Id = jobId,
+        Attempt_Count__c = generation + 1,
+        Next_Attempt_At__c = System.now().addMinutes(delayFor(generation))
+      ),
+      false,
+      AccessLevel.SYSTEM_MODE
+    );
+  }
+
   public static ProcessOutcome process(
     Id jobId,
     Integer generation,

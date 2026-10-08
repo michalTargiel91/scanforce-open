@@ -3,6 +3,20 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixes
+
+* **One job that cannot be processed no longer stops the others.** When an execution failed
+  with an error nothing could handle (for example a customer validation rule or Flow fault that
+  rejects ScanForce Open's update), the job stayed the oldest due job and every recovery sweep
+  chose it first again, so no other job moved. A finalizer now defers the job (one attempt spent,
+  the usual retry delay) and the chain continues without it, keeping the 20-execution cap.
+  User-requested refreshes are not retried and finished jobs are not touched. Found by the
+  best-practices review, which reproduced it: ten healthy jobs stayed untouched behind one
+  rejected job, and processed within seconds once it was skipped. No schema, status or
+  public-contract change.
+
 ## 1.0.3 — 2026-10-08
 
 Patch release from a Salesforce engineering-quality audit with Salesforce Code Analyzer v5,
