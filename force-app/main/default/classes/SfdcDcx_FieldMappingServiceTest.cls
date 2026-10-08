@@ -316,12 +316,104 @@ private class SfdcDcx_FieldMappingServiceTest {
   }
 
   @IsTest
+  static void interleavedTargetObjectsApplyInOneRequest() {
+    useMappings();
+    System.runAs(SfdcDcx_TestFactory.userByAlias('sfomap')) {
+      // Fixtures are inserted per type; only the request order alternates, so the
+      // service's update list changes object type 11 times.
+      List<Account> accounts = new List<Account>();
+      List<Contact> contacts = new List<Contact>();
+      for (Integer i = 0; i < 6; i++) {
+        accounts.add(new Account(Name = 'Synthetic customer ' + i));
+        contacts.add(new Contact(LastName = 'Synthetic contact ' + i));
+      }
+      insert accounts;
+      insert contacts;
+      List<SObject> sources = new List<SObject>();
+      for (Integer i = 0; i < 6; i++) {
+        sources.add(accounts[i]);
+        sources.add(contacts[i]);
+      }
+      List<ContentVersion> files = new List<ContentVersion>();
+      for (Integer i = 0; i < sources.size(); i++)
+        files.add(
+          new ContentVersion(
+            Title = 'invoice ' + i,
+            PathOnClient = 'invoice' + i + '.pdf',
+            VersionData = Blob.valueOf(
+              '%PDF synthetic ScanForce Open test bytes'
+            ),
+            FirstPublishLocationId = sources[i].Id
+          )
+        );
+      insert files;
+      SfdcDcx_Worker.suppressEnqueue = true;
+      List<SfdcDcx_ProcessingService.SubmitRequest> requests = new List<SfdcDcx_ProcessingService.SubmitRequest>();
+      for (Integer i = 0; i < sources.size(); i++) {
+        SfdcDcx_ProcessingService.SubmitRequest request = new SfdcDcx_ProcessingService.SubmitRequest();
+        request.contentVersionId = files[i].Id;
+        request.sourceRecordId = sources[i].Id;
+        request.documentType = 'auto';
+        requests.add(request);
+      }
+      List<Id> jobIds = new List<Id>();
+      for (
+        SfdcDcx_ProcessingService.SubmitResult submitted : SfdcDcx_ProcessingService.submit(
+          requests
+        )
+      ) {
+        System.assert(submitted.success, submitted.errorCode);
+        jobIds.add(submitted.processingJobId);
+      }
+      List<SfdcDcx_Processing_Job__c> completed = new List<SfdcDcx_Processing_Job__c>();
+      for (Id jobId : jobIds)
+        completed.add(
+          new SfdcDcx_Processing_Job__c(
+            Id = jobId,
+            Status__c = 'Completed',
+            Provider_Job_Id__c = 'remote_' + String.valueOf(jobId).right(6),
+            Attempt_Count__c = 2,
+            Result_JSON__c = SfdcDcx_TestFactory.INVOICE_RESULT,
+            Completed_At__c = System.now()
+          )
+        );
+      Database.update(completed, AccessLevel.SYSTEM_MODE);
+
+      List<SfdcDcx_FieldMappingService.ApplyResult> results = SfdcDcx_FieldMappingService.apply(
+        jobIds,
+        null
+      );
+
+      System.assertEquals(jobIds.size(), results.size());
+      for (SfdcDcx_FieldMappingService.ApplyResult result : results)
+        System.assert(
+          result.success,
+          'Every job must apply however the target objects interleave: ' +
+          result.errorMessage
+        );
+      System.assertEquals(
+        6,
+        [SELECT COUNT() FROM Contact WHERE Title = '1240.5'],
+        'Contacts must receive the mapped value'
+      );
+      System.assertEquals(
+        6,
+        [SELECT COUNT() FROM Account WHERE AccountNumber = 'INV-001'],
+        'Accounts must receive the mapped value'
+      );
+    }
+  }
+
+  @IsTest
   static void oversizedBatchesAreRejectedClearly() {
     List<Id> jobIds = new List<Id>();
     for (Integer i = 0; i < SfdcDcx_FieldMappingService.MAX_JOBS + 1; i++)
       jobIds.add(
         Id.valueOf(
-          SfdcDcx_Processing_Job__c.SObjectType.getDescribe().getKeyPrefix() +
+          SfdcDcx_Processing_Job__c.SObjectType.getDescribe(
+                SObjectDescribeOptions.DEFERRED
+              )
+              .getKeyPrefix() +
             '000000000' +
             String.valueOf(i).leftPad(3, '0')
         )

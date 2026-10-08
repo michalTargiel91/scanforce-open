@@ -54,12 +54,18 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
   searchTimer;
   lastChangeAt = 0;
   lastSignature = "";
+  connected = false;
+  // Only the newest request may write state: responses can arrive out of order.
+  jobsRequest = 0;
+  filesRequest = 0;
 
   connectedCallback() {
+    this.connected = true;
     this.load();
   }
 
   disconnectedCallback() {
+    this.connected = false;
     this.stopPolling();
     clearTimeout(this.searchTimer);
   }
@@ -77,6 +83,7 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
   }
 
   async loadJobs() {
+    const request = ++this.jobsRequest;
     this.jobsLoading = this.jobs.length === 0;
     try {
       const rows = await listJobs({
@@ -84,16 +91,22 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
         sourceRecordId: null,
         limitSize: 50,
       });
+      if (request !== this.jobsRequest) {
+        return;
+      }
       this.trackChanges(rows);
       this.jobs = rows;
       this.lastLoaded = new Date().toISOString();
       this.loadError = undefined;
     } catch (error) {
-      this.loadError = reduceError(error);
-    } finally {
-      this.jobsLoading = false;
+      if (request === this.jobsRequest) {
+        this.loadError = reduceError(error);
+      }
     }
-    this.schedulePolling();
+    if (request === this.jobsRequest) {
+      this.jobsLoading = false;
+      this.schedulePolling();
+    }
   }
 
   async refreshCounts() {
@@ -118,9 +131,10 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
   schedulePolling() {
     clearTimeout(this.pollTimer);
     const idleTooLong = Date.now() - this.lastChangeAt > POLL_IDLE_LIMIT_MS;
-    this.polling = hasActive(this.jobs) && !idleTooLong;
+    // A request that resolves after removal must not re-arm the timer.
+    this.polling = this.connected && hasActive(this.jobs) && !idleTooLong;
     if (this.polling) {
-      // eslint-disable-next-line @lwc/lwc/no-async-operation
+      // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
       this.pollTimer = setTimeout(() => this.poll(), POLL_INTERVAL_MS);
     }
   }
@@ -307,19 +321,27 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
   handleFileSearch(event) {
     this.fileSearch = event.detail.value || "";
     clearTimeout(this.searchTimer);
-    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    // eslint-disable-next-line @lwc/lwc/no-async-operation -- debounce; cleared on disconnect
     this.searchTimer = setTimeout(() => this.loadFiles(), 300);
   }
 
   async loadFiles() {
+    const request = ++this.filesRequest;
     this.filesLoading = true;
     try {
-      this.files = await listRecentFiles({ searchTerm: this.fileSearch });
+      const files = await listRecentFiles({ searchTerm: this.fileSearch });
+      if (request === this.filesRequest) {
+        this.files = files;
+      }
     } catch (error) {
-      this.files = [];
-      this.toast("Could not load files", reduceError(error), "error");
+      if (request === this.filesRequest) {
+        this.files = [];
+        this.toast("Could not load files", reduceError(error), "error");
+      }
     } finally {
-      this.filesLoading = false;
+      if (request === this.filesRequest) {
+        this.filesLoading = false;
+      }
     }
   }
 

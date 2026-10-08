@@ -19,8 +19,13 @@ those with mappings for your provider's result keys.
 Behaviour worth knowing:
 
 * Files other than PDF, PNG and JPEG are rejected by the action without
-  creating a job, and the upload itself never fails because of processing.
-  Users without the permission are skipped by the entry condition.
+  creating a job, and a rejection is returned as an outcome rather than
+  failing the upload. Users without the permission are skipped by the entry
+  condition.
+* The Flows ship without fault paths (the Flow Scanner reports
+  `MissingFaultHandler`, severity 2 / High, once per Flow). An unexpected error in an action would therefore fail
+  the Flow and, in the intake Flow, the upload that triggered it. Add fault paths
+  that match your policy before you activate them in production.
 * The submit runs as the uploading user, so that user needs **ScanForce Open
   User** and **Provider Access**.
 * **Review Required** jobs do not match the apply Flow. They are applied once

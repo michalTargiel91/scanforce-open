@@ -1,7 +1,19 @@
-# This is a non-secret digest of org/file/type, not an authentication credential.
-# Scope the exception to one rule, one field and one finding; keep every other
-# Security rule and field active. Its provenance is pinned in the Apex tests.
+# Salesforce Code Analyzer v5 configuration. docs/testing.md explains the scans.
+#
+# Suppression policy
+# * Bulk suppressions only: one file, one rule, a pinned count and a reason. A new
+#   violation beyond the count is reported again, so an entry cannot quietly grow
+#   into a blanket.
+# * No inline `code-analyzer-suppress` markers. In Code Analyzer 5.16.0 one marker
+#   silenced other rules and other methods of the same file, and a marker naming a
+#   rule that does not exist silenced everything.
+# * No PMD `@SuppressWarnings`. It used to sit on explicit SYSTEM_MODE queries, which
+#   PMD already accepts as a deliberate choice, so it masked nothing today and would
+#   have hidden a future regression.
 suppressions:
+  # This is a non-secret digest of org/file/type, not an authentication credential.
+  # Scope the exception to one rule, one field and one finding; keep every other
+  # Security rule and field active. Its provenance is pinned in the Apex tests.
   force-app/main/default/objects/SfdcDcx_Processing_Job__c/fields/Dedup_Hash__c.field-meta.xml:
     - rule_selector: pmd:ProtectSensitiveData
       max_suppressed_violations: 1
@@ -10,3 +22,52 @@ suppressions:
     - rule_selector: pmd:ProtectSensitiveData
       max_suppressed_violations: 1
       reason: Public ordinary-submit digest; authentication is exclusively Salesforce External Credentials.
+
+  # Operations in loops that are bounded by construction.
+  force-app/main/default/classes/SfdcDcx_ContentVersionSelector.cls:
+    - rule_selector: pmd:OperationWithLimitsInLoop
+      max_suppressed_violations: 1
+      reason: One query per distinct source object type. SfdcDcx_ProcessingService rejects a request with more than MAX_SOURCE_OBJECT_TYPES (10) types before calling this method, far below the 100 SOQL limit.
+  force-app/main/default/classes/SfdcDcx_RecoveryScheduler.cls:
+    - rule_selector: pmd:OperationWithLimitsInLoop
+      max_suppressed_violations: 1
+      reason: Schedules the fixed twelve five-minute entries once, from an administrator action. The platform allows 100 scheduled jobs.
+  force-app/main/default/classes/SfdcDcx_FieldMappingService.cls:
+    - rule_selector: pmd:OperationWithLimitsInLoop
+      max_suppressed_violations: 1
+      reason: One update per target object type. plan() admits at most MAX_OBJECT_TYPES (10) types and rejects the rest, so there are at most ten statements; a single mixed-type list fails beyond ten type changes.
+
+  # Inline `eslint-disable-next-line` comments, flagged by @lwc/lwc-platform/no-inline-disable.
+  # Plain `npm run lint:lwc` needs them; each has a written reason at the call site.
+  # Polling and debouncing cannot be written without a timer. Every timer is cleared on
+  # disconnect and cannot be re-armed after it (covered by Jest).
+  force-app/main/default/lwc/sfdcDcxWorkspace/sfdcDcxWorkspace.js:
+    - rule_selector: eslint:@lwc/lwc-platform/no-inline-disable
+      max_suppressed_violations: 2
+      reason: Job-list poll timer and debounced file search (@lwc/lwc/no-async-operation).
+  force-app/main/default/lwc/sfdcDcxJobDetail/sfdcDcxJobDetail.js:
+    - rule_selector: eslint:@lwc/lwc-platform/no-inline-disable
+      max_suppressed_violations: 1
+      reason: Job page poll timer (@lwc/lwc/no-async-operation).
+  force-app/main/default/lwc/sfdcDcxRecordDocuments/sfdcDcxRecordDocuments.js:
+    - rule_selector: eslint:@lwc/lwc-platform/no-inline-disable
+      max_suppressed_violations: 1
+      reason: Record page poll timer (@lwc/lwc/no-async-operation).
+  force-app/main/default/lwc/sfdcDcxJobState/sfdcDcxJobState.js:
+    - rule_selector: eslint:@lwc/lwc-platform/no-inline-disable
+      max_suppressed_violations: 1
+      reason: Submission batches are sent one after another on purpose, one authorised transaction per call (no-await-in-loop).
+
+rules:
+  pmd:
+    # Code style only. Prettier formats the source and keeps a one-statement body on
+    # its own indented line; about 550 sites follow that and none is a defect. They
+    # stay visible as Info in the deep audit instead of drowning it.
+    IfStmtsMustUseBraces:
+      severity: 5
+    IfElseStmtsMustUseBraces:
+      severity: 5
+    ForLoopsMustUseBraces:
+      severity: 5
+    WhileLoopsMustUseBraces:
+      severity: 5

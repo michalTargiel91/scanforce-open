@@ -6,7 +6,6 @@ public without sharing class SfdcDcx_RecoveryScheduler implements Schedulable {
     SfdcDcx_AsyncDispatcher.enqueueNextAutomatic();
   }
 
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   public static void install() {
     Set<String> existing = new Set<String>();
     for (CronTrigger schedule : [
@@ -27,10 +26,9 @@ public without sharing class SfdcDcx_RecoveryScheduler implements Schedulable {
     }
   }
 
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   public static void uninstall() {
     for (CronTrigger schedule : [
-      SELECT Id, CronJobDetail.Name
+      SELECT Id
       FROM CronTrigger
       WHERE CronJobDetail.Name LIKE 'SfdcDcx Recovery %'
       WITH SYSTEM_MODE

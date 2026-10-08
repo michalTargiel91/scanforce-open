@@ -357,7 +357,6 @@ public with sharing class SfdcDcx_SetupController {
   }
 
   /** Counts only; assignments themselves are created in USER_MODE by grantProviderAccess. */
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   private static AccessStatus accessStatus(List<String> accessSets) {
     AccessStatus access = new AccessStatus();
     access.permissionSets = accessSets;
@@ -385,7 +384,6 @@ public with sharing class SfdcDcx_SetupController {
     return access;
   }
 
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   private static List<Id> usersWithoutAccess(
     List<String> accessSets,
     Integer maxUsers
@@ -414,7 +412,6 @@ public with sharing class SfdcDcx_SetupController {
   }
 
   /** Reads only ScanForce Open's own schedule names, like SfdcDcx_RecoveryScheduler. */
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   private static RecoveryStatus recoveryStatus() {
     RecoveryStatus recovery = new RecoveryStatus();
     recovery.scheduled = [

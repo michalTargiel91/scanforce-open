@@ -90,6 +90,13 @@ Pull the new version and deploy `force-app` again (`bash scripts/install.sh
 command of option B). Credentials, mappings, jobs and schedules are kept. Read
 the [changelog](../CHANGELOG.md) for any manual steps.
 
+Never redeploy `provider-config/` over an existing installation. It carries the
+placeholder endpoint and the Bearer header formula, so deploying it replaces your
+endpoint and any custom formula (for example HTTP Basic) and the callouts then fail
+with `Field SfdcDcx_ProviderAuth.Token does not exist`. `install.sh` checks for the
+existing Named Credential and skips the bootstrap on its own; `--skip-credentials` just
+makes that explicit.
+
 Salesforce refuses to redeploy Apex classes while their scheduled or queued jobs
 are pending. With the recovery schedule installed this is always the case, so
 upgrades need **Setup → Deployment Settings → Allow deployments of components

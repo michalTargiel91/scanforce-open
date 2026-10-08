@@ -1,6 +1,6 @@
 {
   "name": "scanforce-open",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Open-source document intelligence workspace for Salesforce. Use DocSolved.ai or bring your own compatible backend.",
   "private": true,
   "license": "Apache-2.0",
@@ -15,7 +15,9 @@
     "test:unit:coverage": "sfdx-lwc-jest --coverage -- --no-cache",
     "test:python": "python3 -m unittest discover -s examples/mock-provider -v && python3 -m unittest discover -s tools/provider-conformance -v && python3 -m unittest discover -s scripts/tests -v",
     "format": "prettier --write \"force-app/**/*.{cls,js,html,css}\"",
-    "format:check": "prettier --check \"force-app/**/*.{cls,js,html,css}\""
+    "format:check": "prettier --check \"force-app/**/*.{cls,js,html,css}\"",
+    "analyze": "bash scripts/code-analyzer.sh gate",
+    "analyze:audit": "bash scripts/code-analyzer.sh audit"
   },
   "devDependencies": {
     "@apexdevtools/apex-parser": "5.2.0",

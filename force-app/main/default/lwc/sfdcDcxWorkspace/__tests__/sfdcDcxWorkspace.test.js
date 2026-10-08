@@ -285,4 +285,110 @@ describe("c-sfdc-dcx-workspace", () => {
     await settle();
     expect(element.shadowRoot.textContent).toContain("Boom");
   });
+
+  it("does not resume polling when it is removed while a refresh is in flight", async () => {
+    const element = mount();
+    await settle();
+    let release;
+    listJobs.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    jest.advanceTimersByTime(8000);
+    await settle();
+    document.body.removeChild(element);
+    release(JOBS);
+    await settle();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("ignores a slower job response for a filter the user already left", async () => {
+    const reviewJob = { ...JOBS[0], id: "a09", status: "Review Required" };
+    const element = mount();
+    await settle();
+    let releaseActive;
+    listJobs.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseActive = resolve;
+        }),
+    );
+    listJobs.mockResolvedValueOnce([reviewJob]);
+    const tiles = element.shadowRoot.querySelectorAll("button.sfo-tile");
+    tiles[0].click();
+    await settle();
+    tiles[1].click();
+    await settle();
+    const rows = () =>
+      element.shadowRoot.querySelector("c-sfdc-dcx-job-list").rows;
+    expect(rows()).toEqual([reviewJob]);
+    releaseActive([JOBS[1]]);
+    await settle();
+    expect(rows()).toEqual([reviewJob]);
+  });
+
+  it("keeps the newest file search when responses arrive out of order", async () => {
+    const file = (id, title) => ({
+      contentVersionId: id,
+      title,
+      extension: "pdf",
+      size: 1000,
+      supported: true,
+    });
+    const element = mount();
+    await settle();
+    Array.from(element.shadowRoot.querySelectorAll("lightning-button"))
+      .find((button) => button.label === "Choose from Salesforce Files")
+      .click();
+    await settle();
+    let releaseOld;
+    listRecentFiles.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseOld = resolve;
+        }),
+    );
+    listRecentFiles.mockResolvedValueOnce([file("068N", "Newest")]);
+    const search = Array.from(
+      element.shadowRoot.querySelectorAll("lightning-input"),
+    ).find((input) => input.type === "search");
+    search.dispatchEvent(
+      new CustomEvent("change", { detail: { value: "in" } }),
+    );
+    jest.advanceTimersByTime(300);
+    await settle();
+    search.dispatchEvent(
+      new CustomEvent("change", { detail: { value: "invoice" } }),
+    );
+    jest.advanceTimersByTime(300);
+    await settle();
+    const ids = () =>
+      element.shadowRoot
+        .querySelector("lightning-datatable")
+        .data.map((row) => row.contentVersionId);
+    expect(ids()).toEqual(["068N"]);
+    releaseOld([file("068O", "Older search")]);
+    await settle();
+    expect(ids()).toEqual(["068N"]);
+  });
+
+  it("stops polling when removed and polls again when added back", async () => {
+    const element = mount();
+    await settle();
+    expect(jest.getTimerCount()).toBe(1);
+    document.body.removeChild(element);
+    expect(jest.getTimerCount()).toBe(0);
+    jest.advanceTimersByTime(60000);
+    await settle();
+    expect(listJobs).toHaveBeenCalledTimes(1);
+    document.body.appendChild(element);
+    await settle();
+    expect(listJobs).toHaveBeenCalledTimes(2);
+    expect(jest.getTimerCount()).toBe(1);
+    jest.advanceTimersByTime(8000);
+    await settle();
+    expect(listJobs).toHaveBeenCalledTimes(3);
+  });
 });

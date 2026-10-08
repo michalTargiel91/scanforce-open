@@ -19,6 +19,7 @@ or usernames. See [SUPPORT.md](../SUPPORT.md).
 | `python3: command not found` | Install Python 3.10 or later. The script uses it only to read CLI output. |
 | Deployment fails in **your own** Apex tests | `RunLocalTests` runs every local test in the org, including existing ones. Fix or deactivate the failing tests. In sandboxes and scratch orgs you can use `--test-level NoTestRun`. Production requires tests. |
 | Deployment fails because Apex jobs are pending | Any re-run of `install.sh` once recovery is installed (and upgrades): add `--allow-pending-jobs`, or uninstall the recovery schedule first. See [install.md](install.md#upgrading). |
+| `install.sh` or `sf project deploy start` fails with *N conflicts detected* or `SourceConflictError` | Scratch orgs and Developer sandboxes track source changes, and this checkout has no record of the earlier deployment (for example a second clone). Upgrade from the checkout you installed with, or run `sf project reset tracking --target-org my-org` first. Production orgs do not track source and never show this. |
 | Components named `SfdcDcx_*` already exist | The org ran the earlier connector these names come from. ScanForce Open upgrades them in place. |
 | App or tabs missing for a user | Assign **ScanForce Open User** (or **Administrator**) to that user. |
 

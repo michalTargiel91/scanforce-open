@@ -492,7 +492,7 @@ export async function submitInBatches(submit, ids, size, request) {
   let outcomes = [];
   for (const batch of chunk(ids, size)) {
     // Sequential on purpose: each call is one authorised, bounded transaction.
-    // eslint-disable-next-line no-await-in-loop
+    // eslint-disable-next-line no-await-in-loop -- batches must not overlap
     const results = await submit({ ...request, contentVersionIds: batch });
     outcomes = outcomes.concat(results);
   }

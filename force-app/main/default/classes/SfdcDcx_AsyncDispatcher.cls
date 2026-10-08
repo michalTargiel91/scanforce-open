@@ -55,6 +55,13 @@ public without sharing class SfdcDcx_AsyncDispatcher {
       AsyncInfo.getMaximumQueueableStackDepth()
     )
       return;
+    // A transaction may start at most Limits.getLimitQueueableJobs() Queueables
+    // (50 synchronously, 1 inside a Queueable). Exceeding it raises an uncatchable
+    // LimitException that aborts the caller's whole transaction, so stop at capacity.
+    // Skipped work stays durable: recovery re-discovers Queued/Processing jobs and
+    // a Review Required refresh can simply be requested again.
+    if (Limits.getQueueableJobs() >= Limits.getLimitQueueableJobs())
+      return;
     // Transaction-local guard: native DuplicateSignature only protects waiting
     // queue entries, not work already dequeued/running in this transaction.
     String signature = workSignature(item);

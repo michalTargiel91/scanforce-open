@@ -19,15 +19,69 @@ npm test              # Jest for all LWCs + Python suites
 | `tools/provider-conformance/test_check_provider.py` | Conformance checker against the mock (normal and review flows, wrong token, HTTPS enforcement, token never printed). |
 | `scripts/tests/test_architecture.py` | Layering (only the dispatcher enqueues, only the gateway and connection check call out, only the trusted selector reads file content), state changes only in the domain, explicit access mode on every query and DML, user/trusted read zones, setup transaction rules, API 67 metadata. |
 | `scripts/tests/test_install.py`, `test_validation.py` | Install script and scratch gate with a fake CLI: never overwrites credentials, rejects unsafe URLs, only mutates the scratch org it created, fails closed on missing coverage. |
+| `scripts/tests/test_code_analyzer_gate.py` | The Code Analyzer gate with a fake CLI: scan selectors and thresholds, fail-closed behaviour, advisory versus blocking audit steps, Graph Engine limitation reporting, pinned tool versions in CI, narrow pinned suppressions. |
 | `scripts/check-metadata.py` | Least-privilege permission sets, no internal fields for users, private sharing, immutable source, forbidden metadata (Connected Apps, Remote Sites, public links, secrets), credential bootstrap has only a placeholder. |
 
-Static security analysis (needs Java 21 and the Salesforce CLI):
+Static analysis with Salesforce Code Analyzer v5 (needs Java 21, Python 3.10+ for the
+Flow Scanner, and the Salesforce CLI; no org):
 
 ```bash
 sf plugins install @salesforce/plugin-code-analyzer@5.16.0
-sf code-analyzer run --workspace . --target force-app --rule-selector pmd:Security --severity-threshold 3
+bash scripts/code-analyzer.sh gate     # the required pull-request gate, about 20 seconds
+bash scripts/code-analyzer.sh audit    # deep audit; JSON, SARIF and HTML in ./code-analyzer-reports
 docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --redact --no-banner
 ```
+
+| Scan | Rules | Fails on | Runs |
+|---|---|---|---|
+| Recommended, blocking severities | Salesforce's Recommended rules of severity 1 and 2 (`Recommended:Critical`, `Recommended:High`) for PMD, ESLint (LWC, SLDS), Flow, Regex and RetireJS | severity 1-2 | every pull request (`ci.yml`) |
+| Security and Performance | `Security` rules of PMD, ESLint, Flow, Regex and RetireJS, plus the Recommended Performance rules (SOQL, DML, callouts and describes in loops) | severity 1-3 | every pull request |
+| PMD Apex, all rules | every PMD Apex rule, including the ones outside Recommended | severity 1-2 | weekly and on demand (`code-quality-audit.yml`) |
+| AppExchange | PMD `AppExchange` rules, as an advisory hardening scan (ScanForce Open is source-distributed, not a managed package) | advisory | weekly |
+| Flow Scanner | the example Flows | advisory | weekly |
+| Duplication, Graph Engine | CPD; Salesforce Graph Engine (Developer Preview) | advisory | weekly |
+| ApexGuru | needs an org: `sf code-analyzer run --workspace force-app --target force-app --target-org my-scratch --rule-selector apexguru` (Basic mode in a scratch org) | advisory | by hand |
+
+Rules of the road:
+
+* **Suppressions** live only in `code-analyzer.yml`: one file, one rule, a pinned
+  count and a written reason, so a new violation beyond the count is reported again.
+  Do not use inline `code-analyzer-suppress` markers: in Code Analyzer 5.16.0 one marker
+  silenced other rules and other methods of the same file, and a marker naming a rule
+  that does not exist silenced everything. Do not add PMD `@SuppressWarnings`: an
+  explicit `WITH SYSTEM_MODE` or `AccessLevel.SYSTEM_MODE` is already accepted by
+  `ApexCRUDViolation`, so the annotation only hides a later mistake.
+  `scripts/tests/test_code_analyzer_gate.py` enforces both.
+* **Style** is formatting's job: `npm run format:check` is the authority. The four PMD
+  brace rules are Info because Prettier-formatted one-statement bodies are the
+  convention.
+* **Graph Engine limitation.** The two entry points that reach
+  `SfdcDcx_ProcessingService.submit` (`SfdcDcx_Submit.submit` and
+  `SfdcDcx_WorkspaceController.submitFiles`) cannot be analyzed: the engine fails on a
+  list-element assignment, and with that avoided it still exceeds a 10 minute path
+  budget. The audit prints this as `ANALYSIS LIMITATION`, never as a pass. Source
+  authorization on that path is covered by the Apex tests (`USER_MODE` reads, link and
+  record checks, SYSTEM_MODE only after them).
+* **Four different outcomes.** The deep audit keeps them apart. *Findings* are in the
+  reports (severity 1 Critical to 5 Info). An *analysis limitation* means the engine
+  could not examine something, which is not a pass. A *false positive* is a finding
+  with a written technical reason (below). A *scanner execution error* (a scan that
+  wrote no readable report, an unthresholded scan that exited non-zero, a Graph Engine
+  log that cannot be read) fails the audit with `SCANNER EXECUTION ERROR`. A thresholded
+  scan exits with the severity it hit, so a Critical finding exits 1 like a failure
+  does: only the report tells them apart.
+* **Standing advisory results** (deep audit, 2026-10-08, Code Analyzer 5.16.0):
+  * Flow Scanner, the two example Flows: 2 × `MissingFaultHandler` at **severity 2
+    (High)** and 10 × `MissingDescription` at severity 4 (Low). Both Flows deploy as
+    Draft, and where a fault goes (ignore it, notify someone, or fail the upload) is the
+    adopter's decision, so no fault path is shipped. The example README says so. These
+    are advisory, not clean.
+  * Graph Engine: 2 entry points unanalyzed (above) and 6 Moderate findings that are
+    false positives. `onlyFields.contains` is reached only when `onlyFields == null ||`
+    is false, `recordId.getSObjectType` only after `if (recordId == null) continue;`,
+    and the four `LIMIT :cap` queries use `cap = COUNT_CAP + 1`, a constant.
+* **npm advisories.** Production dependencies are a gate (`npm audit --omit=dev`); the
+  development toolchain is reported only, because nothing from npm is deployed.
 
 ## 2. Salesforce runtime gate (scratch org)
 
@@ -126,6 +180,34 @@ Recorded for 1.0.2 (October 2026): Bearer (shipped formula), raw key in
 `X-API-Key` (Token stored through the Configuration page's Apex method) and HTTP
 Basic (parameters entered through the Setup UI) all authenticated; OAuth 2.0
 client credentials and mutual TLS were not tested.
+
+### Recorded runtime and upgrade run (1.0.3, 8 October 2026)
+
+Two disposable API 67 scratch orgs, synthetic data only, deleted afterwards.
+
+* Clean install of the release candidate (`scripts/validate-scratch.sh`): 146 of 146 Apex
+  tests passed, 92% test-run coverage and 91% org-wide. A live 25-file submission used
+  4 queries, 51 query rows, 1 DML statement, 1 Queueable and no callouts; submitting the
+  same 25 files again returned the same 25 job IDs and created none. Recovering and
+  refreshing 60 jobs each started exactly 50 Queueables (the limit) without an exception,
+  and every one of the 60 recovered jobs, including the 10 beyond the limit, was
+  processed by the Queueable chain and the recovery schedule.
+* The same three scripts against a real 1.0.2 installation reproduced the defects:
+  `System.LimitException: Too many queueable jobs added to the queue: 51` for Recover and
+  for Refresh, and `System.TypeException: Cannot have more than 10 chunks in a single
+  operation` for twelve Account and Contact jobs applied in one call.
+* Upgrade from 1.0.2 with `install.sh` (default credential handling, `RunLocalTests`,
+  `--allow-pending-jobs`): five jobs in four states, their source files and file links,
+  the settings record, twelve recovery schedules, permission set assignments, field
+  mappings and 43 retrieved metadata files (permission sets, custom permissions, objects,
+  fields, validation rule, mappings, Named and External Credential) were identical
+  before and after. A custom HTTP Basic formula and the stored principal keep working
+  (`callout:SfdcDcx_Provider` returned 200). The installer reported *Provider credential
+  already exists; leaving its endpoint and secret untouched.* Afterwards the mixed-object
+  apply succeeded, a pre-existing Processing job resumed on the new code, and mappings
+  applied through the 1.0.2 jobs' source associations. As a control, deploying
+  `provider-config/` by hand reset the formula to Bearer and the URL to the placeholder,
+  and the same comparison caught it.
 
 ### Recorded public-HTTPS run (1.0.2, 7 October 2026)
 

@@ -20,7 +20,6 @@ public without sharing class SfdcDcx_ContentVersionSelector {
   }
 
   /** Trusted processing may continue after the initiating user loses access. */
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   public static ContentVersion selectMetadataByIdSystem(Id id) {
     List<ContentVersion> rows = [
       SELECT
@@ -38,7 +37,6 @@ public without sharing class SfdcDcx_ContentVersionSelector {
   }
 
   /** Never add VersionData to either metadata selector. */
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   public static ContentVersion selectBodyByIdSystem(Id id) {
     List<ContentVersion> rows = [
       SELECT Id, VersionData
