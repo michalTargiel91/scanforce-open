@@ -22,7 +22,7 @@
   "devDependencies": {
     "@apexdevtools/apex-parser": "5.2.0",
     "@babel/core": "^7.28.0",
-    "@babel/eslint-parser": "^7.28.0",
+    "@babel/eslint-parser": "^8.0.6",
     "@lwc/eslint-plugin-lwc": "^3.5.0",
     "@salesforce/eslint-config-lwc": "^4.1.2",
     "@salesforce/eslint-plugin-lightning": "^2.0.0",
