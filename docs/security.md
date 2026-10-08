@@ -74,11 +74,40 @@ Salesforce user ──► ScanForce Open entry point ──► trusted processin
 No document content is written to logs by ScanForce Open code. Do not enable
 verbose callout debug logging while processing sensitive documents.
 
+## Retention
+
+ScanForce Open deletes nothing by itself. How long to keep processing jobs is your
+decision (a result can hold business or personal data and the right period depends on
+your obligations), so none is suggested here.
+
+* No shipped permission set grants Delete on processing jobs: users and ScanForce Open
+  administrators cannot delete them. System Administrators can, through their profile.
+* Deleting a job does not delete its Salesforce File, and deleting a File does not change
+  a job or its result; source references are plain text, not lookups.
+* Values already applied to a record stay on that record when the job is deleted. The job
+  is what records the status, counters, error code and applied time.
+* Size: about 1.9 KB per job with small results (a result can be up to 100 KiB). With
+  250,000 jobs in a scratch org the slowest measured query took about 0.5 s
+  ([review](SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md#scalability)). That is one data shape, not a limit.
+
+ScanForce Open ships no retention automation, and none has been tested here. If you
+delete jobs automatically (for example a scheduled Flow or a batch job), use a user or
+automation that you chose and that has Delete on the object, limit it to finished jobs
+(`Completed`, `Failed`, `Cancelled` or `Timed Out`, never `Queued`, `Processing` or
+`Review Required`), and try it in a sandbox first. Deletion cannot be undone.
+
 ## Administrator responsibilities
 
 * Choose providers you trust and have agreements with; configure HTTPS only.
 * Assign permission sets deliberately; review who has View All on jobs.
-* Apply retention to processing jobs (results are business data).
+* Apply [retention](#retention) to processing jobs (results are business data).
+* Treat provider output as untrusted input. ScanForce Open shows values as text,
+  offers review links only on the provider's origin, converts applied values strictly
+  by field type and writes them under the running user's permissions, after a preview.
+  It cannot tell whether a value is *correct*: the provider, trusted or compromised,
+  chooses what goes into each mapped field. This matters most for a Flow or Apex that
+  applies mappings with nobody looking. Map only fields that can tolerate a wrong value,
+  and apply as a user who can edit only those.
 * Review custom Flows that act on job results: run side effects asynchronously,
   act only on `Completed`, and keep system-mode automation narrow.
 * Keep System Administrator access limited: administrators can always bypass

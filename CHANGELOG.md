@@ -41,6 +41,17 @@ No change to the architecture, `/connect/v1` or any public contract.
 
 ### Documentation
 
+* [Retention](docs/security.md#retention): nothing deletes jobs automatically, no shipped
+  permission set can delete them, and what was measured about their size. No retention
+  automation is shipped or tested.
+* [Provider output is untrusted input](docs/security.md#administrator-responsibilities): the
+  provider chooses the values that mapped fields receive, which matters most for a Flow that
+  applies mappings with nobody looking.
+* [Bulk Refresh and Recover](docs/developer.md#record-triggered-automation-and-limits): they
+  return nothing, and when over the limit the first jobs by Id are taken.
+* [Recovery schedule owner](docs/install.md#after-installation) and an untested
+  [sandbox refresh checklist](docs/install.md#after-a-sandbox-refresh).
+* [Try again](docs/troubleshooting.md) after an authentication failure works on one job at a time; there is no bulk version.
 * Capacity: the [recovery guide](docs/recovery.md#capacity) now states the measured throughput
   (20 executions per five-minute sweep) and that the 60-minute budget counts queue wait.
 * Uninstalling: the delete stops at the active record page; the install guide now says how

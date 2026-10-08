@@ -190,6 +190,15 @@ apply. One request updates each record at most once.
   shared with anything else that already queued work). The rest is skipped, not
   failed: the recovery schedule picks up due Queued and Processing jobs within five
   minutes, and a skipped Review Required refresh can be requested again.
+  Neither the Flow actions nor `SfdcDcx_Api.refresh` and `recover` report how many jobs
+  they started or skipped; they return nothing. When more jobs are passed than there is
+  capacity for, the first ones are taken in Id order: the query has no `ORDER BY`, and in
+  testing three different input orders gave the same result, but the order is not a
+  guarantee. A scheduled Flow that passes every Review Required job on each run can
+  therefore keep re-checking the same first 50 while they stay unreviewed. Pass at most
+  50 Ids per run and choose them yourself, for example by a created-date window that you
+  move on each run
+  ([review, R3](SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md#r3-bulk-refresh-and-recover-are-best-effort-silent-and-not-fair)).
 * Flows triggered by job updates run inside the processing transaction; keep
   them light and asynchronous.
 

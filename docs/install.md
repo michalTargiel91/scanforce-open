@@ -83,6 +83,13 @@ endpoint or authentication.
    custom object page) and define [field mappings](developer.md#field-mappings).
 4. Upload a test document in **ScanForce Open → Workspace**.
 
+**Who owns the recovery schedules.** They run as the user who installs them. Install as a
+user who will stay active and has **ScanForce Open Provider Access**, not as a person who
+may leave. What the platform does with schedules whose owner is later deactivated was not
+tested here. If that happens, **Setup → Scheduled Jobs** shows who submitted each one; run
+`SfdcDcx_RecoveryScheduler.uninstall();` and then `install();` as the user who should own
+them. `install()` alone skips schedules that already exist, whoever owns them.
+
 ## Upgrading
 
 Pull the new version and deploy `force-app` again (`bash scripts/install.sh
@@ -106,6 +113,26 @@ in Setup). ScanForce Open tolerates this: an interrupted job resumes from its
 stored state through the recovery sweep. Alternatively run
 `SfdcDcx_RecoveryScheduler.uninstall();`, wait until no ScanForce Open Apex jobs
 are queued, deploy, and install the schedule again.
+
+## After a sandbox refresh
+
+This has **not been tested** on a real refresh. The checklist comes from what ScanForce
+Open stores and how recovery works, not from observed refresh behavior. What a refresh
+copies depends on the sandbox type, so check each item instead of assuming it.
+
+1. Open **Configuration**. If it reports no recovery schedule, install it
+   (**Background recovery**). If schedules came across, check who owns them (see above).
+2. Check the provider endpoint, the stored key and **Test connection**. Do not reuse a
+   production key in a sandbox; ask your provider for a non-production key.
+3. Look at jobs that were copied from production in `Queued` or `Processing` before the
+   recovery schedule runs. The sweep processes them and each one makes provider calls
+   with the sandbox's credentials, and their provider job IDs belong to the production
+   account, which a sandbox provider may not know. Delete them or let them finish in
+   production first. Review Required and finished jobs are never processed
+   automatically.
+4. Jobs refer to Salesforce Files by ID, and permission set assignments belong to
+   users. Check that both exist in the sandbox, and assign the permission sets again
+   where they do not.
 
 ## Uninstalling
 
