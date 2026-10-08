@@ -33,12 +33,15 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
   pollTimer;
   lastChangeAt = Date.now();
   lastSignature = "";
+  connected = false;
 
   connectedCallback() {
+    this.connected = true;
     this.load();
   }
 
   disconnectedCallback() {
+    this.connected = false;
     clearTimeout(this.pollTimer);
   }
 
@@ -71,11 +74,13 @@ export default class SfdcDcxRecordDocuments extends LightningElement {
 
   schedule() {
     clearTimeout(this.pollTimer);
+    // A request that resolves after removal must not re-arm the timer.
     if (
+      this.connected &&
       hasActive(this.jobs) &&
       Date.now() - this.lastChangeAt < POLL_IDLE_LIMIT_MS
     ) {
-      // eslint-disable-next-line @lwc/lwc/no-async-operation
+      // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
       this.pollTimer = setTimeout(() => {
         if (document.visibilityState === "hidden") {
           this.schedule();

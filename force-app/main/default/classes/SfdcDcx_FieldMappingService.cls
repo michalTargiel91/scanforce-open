@@ -259,33 +259,54 @@ public with sharing class SfdcDcx_FieldMappingService {
   ) {
     if (updates.isEmpty())
       return;
-    Database.SaveResult[] saves = Database.update(
-      updates,
-      false,
-      AccessLevel.USER_MODE
-    );
     List<SfdcDcx_Processing_Job__c> stamps = new List<SfdcDcx_Processing_Job__c>();
-    for (Integer i = 0; i < saves.size(); i++) {
-      ApplyResult outcome = results.get(updateJobs[i]);
-      if (saves[i].isSuccess()) {
-        outcome.success = true;
-        outcome.updatedFields = counts.get(updateJobs[i]);
-        stamps.add(
-          new SfdcDcx_Processing_Job__c(
-            Id = updateJobs[i],
-            Applied_At__c = System.now()
-          )
-        );
-      } else {
-        outcome.errorCode = 'UPDATE_FAILED';
-        outcome.errorMessage = saves[i].getErrors().isEmpty()
-          ? message('UPDATE_FAILED')
-          : saves[i].getErrors()[0].getMessage().abbreviate(255);
+    // One DML statement per object type (at most MAX_OBJECT_TYPES): a single mixed
+    // list fails with "Cannot have more than 10 chunks" once it changes type 10 times.
+    for (List<Integer> positions : positionsByType(updates).values()) {
+      List<SObject> sameType = new List<SObject>();
+      for (Integer position : positions)
+        sameType.add(updates[position]);
+      Database.SaveResult[] saves = Database.update(
+        sameType,
+        false,
+        AccessLevel.USER_MODE
+      );
+      for (Integer i = 0; i < saves.size(); i++) {
+        Id jobId = updateJobs[positions[i]];
+        ApplyResult outcome = results.get(jobId);
+        if (saves[i].isSuccess()) {
+          outcome.success = true;
+          outcome.updatedFields = counts.get(jobId);
+          stamps.add(
+            new SfdcDcx_Processing_Job__c(
+              Id = jobId,
+              Applied_At__c = System.now()
+            )
+          );
+        } else {
+          outcome.errorCode = 'UPDATE_FAILED';
+          outcome.errorMessage = saves[i].getErrors().isEmpty()
+            ? message('UPDATE_FAILED')
+            : saves[i].getErrors()[0].getMessage().abbreviate(255);
+        }
       }
     }
     // Connector-owned audit stamp after the user-mode record update succeeded.
     if (!stamps.isEmpty())
       Database.update(stamps, false, AccessLevel.SYSTEM_MODE);
+  }
+
+  private static Map<Schema.SObjectType, List<Integer>> positionsByType(
+    List<SObject> records
+  ) {
+    Map<Schema.SObjectType, List<Integer>> positions = new Map<Schema.SObjectType, List<Integer>>();
+    for (Integer i = 0; i < records.size(); i++) {
+      Schema.SObjectType objectType = records[i].getSObjectType();
+      if (!positions.containsKey(objectType))
+        positions.put(objectType, new List<Integer>());
+      positions.get(objectType).add(i);
+    }
+    return positions;
   }
 
   private static Map<Id, Plan> plan(List<Id> jobIds) {

@@ -34,7 +34,6 @@ public without sharing class SfdcDcx_ProcessingJobSelector {
   }
 
   /** Trusted dedupe reads private connector state after source authorization. */
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   public static Map<String, SfdcDcx_Processing_Job__c> selectByDedupHashes(
     Set<String> hashes
   ) {
@@ -94,7 +93,6 @@ public without sharing class SfdcDcx_ProcessingJobSelector {
   }
 
   /** Oldest durable automatic work, due work first, without loading source bytes. */
-  @SuppressWarnings('PMD.ApexCRUDViolation')
   public static SfdcDcx_Processing_Job__c selectNextAutomatic() {
     Datetime now = System.now();
     List<SfdcDcx_Processing_Job__c> rows = [

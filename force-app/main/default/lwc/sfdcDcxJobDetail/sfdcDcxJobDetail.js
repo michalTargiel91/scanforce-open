@@ -35,12 +35,15 @@ export default class SfdcDcxJobDetail extends NavigationMixin(
   pollTimer;
   watchPolls = 0;
   lastChangeAt = Date.now();
+  connected = false;
 
   connectedCallback() {
+    this.connected = true;
     this.load();
   }
 
   disconnectedCallback() {
+    this.connected = false;
     clearTimeout(this.pollTimer);
   }
 
@@ -68,6 +71,10 @@ export default class SfdcDcxJobDetail extends NavigationMixin(
 
   schedule() {
     clearTimeout(this.pollTimer);
+    // A request that resolves after removal must not re-arm the timer.
+    if (!this.connected) {
+      return;
+    }
     const watching = this.watchPolls > 0;
     const activeAndFresh =
       this.job &&
@@ -77,7 +84,7 @@ export default class SfdcDcxJobDetail extends NavigationMixin(
       if (watching) {
         this.watchPolls -= 1;
       }
-      // eslint-disable-next-line @lwc/lwc/no-async-operation
+      // eslint-disable-next-line @lwc/lwc/no-async-operation -- bounded poll; never re-armed after disconnect
       this.pollTimer = setTimeout(() => this.load(), POLL_INTERVAL_MS);
     }
   }

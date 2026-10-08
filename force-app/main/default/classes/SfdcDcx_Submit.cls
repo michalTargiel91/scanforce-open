@@ -26,7 +26,10 @@ public with sharing class SfdcDcx_Submit {
   public static void authorize() {
     if (
       !FeatureManagement.checkPermission('SfdcDcx_Use') ||
-      !SfdcDcx_Processing_Job__c.SObjectType.getDescribe().isAccessible()
+      !SfdcDcx_Processing_Job__c.SObjectType.getDescribe(
+          SObjectDescribeOptions.DEFERRED
+        )
+        .isAccessible()
     )
       throw new ConnectorException(
         'The Use ScanForce Open permission is required.'

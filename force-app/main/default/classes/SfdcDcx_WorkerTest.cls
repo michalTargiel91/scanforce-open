@@ -589,7 +589,10 @@ private class SfdcDcx_WorkerTest {
         !SfdcDcx_Processing_Job__c.Status__c.getDescribe().isUpdateable()
       );
       System.assert(
-        !SfdcDcx_Processing_Job__c.SObjectType.getDescribe().isCreateable()
+        !SfdcDcx_Processing_Job__c.SObjectType.getDescribe(
+            SObjectDescribeOptions.DEFERRED
+          )
+          .isCreateable()
       );
       Id id = job();
       Test.setMock(HttpCalloutMock.class, new Provider('completed'));

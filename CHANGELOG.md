@@ -3,6 +3,58 @@
 All notable changes to ScanForce Open are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Result of a Salesforce engineering-quality audit with Salesforce Code Analyzer v5, PMD, the
+Graph Engine, Flow Scanner, ESLint, ApexGuru (Basic) and a manual review against platform
+behavior. Two Apex governor-limit defects and two LWC lifecycle defects were reproduced
+with failing tests first and fixed. The architecture, `/connect/v1`, the API version and
+the security model are unchanged.
+
+### Fixes
+
+* **Bulk Recover and Refresh could abort the caller.** Both start one Queueable per eligible
+  job with no limit check, so a Flow or Apex call over more than 50 jobs raised an
+  uncatchable `LimitException: Too many queueable jobs` and rolled back the caller's whole
+  transaction. Enqueueing now stops at the transaction's remaining capacity; skipped work is
+  rediscovered by the recovery schedule or can be requested again
+  ([limits](docs/developer.md#record-triggered-automation-and-limits)).
+* **Applying field mappings to jobs of several record types in one request failed** with
+  `Cannot have more than 10 chunks in a single operation` as soon as the request switched
+  object type eleven times (for example Account, Contact, Account, Contact, ...). The update
+  is now one statement per object type, at most ten.
+* **LWC polling outlived its component.** A request that resolved after the workspace, job or
+  record-documents component was removed re-armed its poll timer, so the detached
+  component kept calling Apex. The workspace also let a slower response for a filter or file
+  search the user had already left overwrite the newer result.
+* `SfdcDcx_Submit.authorize()` no longer loads child relationships it does not use
+  (`SObjectDescribeOptions.DEFERRED`, as the workspace controller already did).
+
+### Quality gate
+
+* **Required pull-request scan** (`scripts/code-analyzer.sh gate`): Salesforce Recommended
+  rules fail on severity 1-2, and the Security and Recommended Performance rules on severity
+  1-3, across Apex, LWC, Flow, metadata and credentials. It replaces the single
+  `pmd:Security` scan.
+* **Weekly deep audit** (`code-quality-audit.yml`): every PMD Apex rule, AppExchange
+  advisory, Flow Scanner, duplication and the Graph Engine, with JSON, SARIF and HTML
+  reports. Entry points the Graph Engine cannot analyze are reported as
+  `ANALYSIS LIMITATION`, not as a pass.
+* **Suppressions audited.** The nine `@SuppressWarnings('PMD.ApexCRUDViolation')`
+  annotations masked nothing (every annotated query declares its mode) and would have hidden
+  a later regression, so they are gone. Remaining suppressions are bulk entries with a pinned
+  count and a reason; inline `code-analyzer-suppress` markers are not used because in Code
+  Analyzer 5.16.0 they suppress other rules and other methods. A test enforces this.
+* New tests: bulk Recover/Refresh limits, mixed-object mapping, a source record the user
+  cannot read, the 25-file submission's governor footprint, and the gate itself.
+
+### Documentation
+
+* [testing](docs/testing.md) describes the scans, thresholds and policy; the Graph Engine
+  limitation is recorded there. The 25-file limits now state the measured query count.
+* The example Flows' README no longer claims an upload can never fail because of processing;
+  it says the Flows ship without fault paths.
+
 ## 1.0.2 — 2026-10-07
 
 Two tooling fixes found by running the public documentation end to end against a real

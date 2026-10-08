@@ -176,13 +176,20 @@ apply. One request updates each record at most once.
 ## Record-triggered automation and limits
 
 * A Queueable processes one job per transaction and makes at most two callouts.
-* Submitting up to 25 files costs one metadata query, one insert and one
-  enqueue; each document then uses about one asynchronous execution per remote
-  attempt.
+* Submitting up to 25 files costs about four queries (one more for each extra
+  source object type, at most ten types), one insert, one enqueue and no
+  callouts; each document then uses about one asynchronous execution per remote
+  attempt. A resubmission that has to reconcile a timed-out remote attempt adds
+  one enqueue per such job, at most 26 in all.
 * Apply-mapping calls handle up to 50 jobs and 10 object types per call, with
-  one query per object type and one update. Larger calls are rejected with
+  one query and one update per object type. Larger calls are rejected with
   `BATCH_LIMIT_EXCEEDED` for every job; split them (for example with a Flow
   loop or a scheduled path).
+* **Recover** and **Refresh** start one background execution per eligible job, up
+  to the capacity the transaction has left (50 in a synchronous transaction,
+  shared with anything else that already queued work). The rest is skipped, not
+  failed: the recovery schedule picks up due Queued and Processing jobs within five
+  minutes, and a skipped Review Required refresh can be requested again.
 * Flows triggered by job updates run inside the processing transaction; keep
   them light and asynchronous.
 
