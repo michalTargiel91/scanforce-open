@@ -45,8 +45,15 @@ the security model are unchanged.
   a later regression, so they are gone. Remaining suppressions are bulk entries with a pinned
   count and a reason; inline `code-analyzer-suppress` markers are not used because in Code
   Analyzer 5.16.0 they suppress other rules and other methods. A test enforces this.
+* **A crashed scanner cannot pass the deep audit.** Findings above a threshold and CLI
+  failures both exit non-zero (a Critical finding exits 1, like an error), and the Graph
+  Engine exits 0 after failing on an entry point. The audit now requires a readable JSON
+  report from every scan, treats a non-zero exit without a threshold as an error, and fails
+  when it cannot read the Graph Engine log; `SCANNER EXECUTION ERROR` is reported apart
+  from findings and from `ANALYSIS LIMITATION`.
 * New tests: bulk Recover/Refresh limits, mixed-object mapping, a source record the user
-  cannot read, the 25-file submission's governor footprint, and the gate itself.
+  cannot read, the 25-file submission's governor footprint, remove-and-re-add behavior of
+  the three polling components, and the gate itself (including crashed scanners).
 
 ### Documentation
 

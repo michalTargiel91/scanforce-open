@@ -6,8 +6,12 @@
 #                                   Performance severity 1-3.
 #   code-analyzer.sh audit [dir]    Periodic deep audit. Writes JSON, SARIF and HTML
 #                                   reports to dir (default code-analyzer-reports).
-#                                   Fails only on PMD Apex severity 1-2; AppExchange,
-#                                   Flow, duplication and Graph Engine results are advisory.
+#                                   Fails on PMD Apex severity 1-2 and on any scanner
+#                                   execution error (a scan with no readable report, an
+#                                   unthresholded scan that exits non-zero, an unreadable Graph
+#                                   Engine log). AppExchange, Flow, duplication and Graph Engine
+#                                   findings are advisory, and entry points the Graph Engine could
+#                                   not analyze are reported as ANALYSIS LIMITATION, never as a pass.
 #
 # Needs Java 21, Python 3.10+ (Flow Scanner) and `sf` with
 # @salesforce/plugin-code-analyzer (CI pins the versions). No Salesforce org is used.
@@ -25,6 +29,8 @@ TARGETS=(
 )
 GITHUB_ACTIONS="${GITHUB_ACTIONS:-}"
 declare -a SCAN_NAMES=()
+declare -a EXECUTION_ERRORS=()
+UNANALYZED_ENTRY_POINTS=0
 
 # scan <name> <threshold|none> <rule-selector>...   (reports go to $out when set)
 scan() {
@@ -57,7 +63,26 @@ scan() {
   fi
   rm -f "$stderr_file"
   [[ -n "$GITHUB_ACTIONS" ]] && echo "::endgroup::"
+  if [[ "$mode" == audit ]]; then
+    # Findings at or above a threshold exit non-zero too (the status is the severity, so a
+    # Critical finding exits 1 like a failure does). Only a readable report proves the scan ran.
+    if ! report_readable "$out/$name.json"; then
+      EXECUTION_ERRORS+=("$name: no readable report (exit $status)")
+    elif [[ "$threshold" == none && $status -ne 0 ]]; then
+      EXECUTION_ERRORS+=("$name: exit $status without a severity threshold")
+    fi
+  fi
   return "$status"
+}
+
+report_readable() {
+  python3 -I - "$1" <<'PY'
+import json, sys
+try:
+    sys.exit(0 if 'violationCounts' in json.load(open(sys.argv[1])) else 1)
+except (OSError, ValueError):
+    sys.exit(1)
+PY
 }
 
 notice() {
@@ -83,13 +108,18 @@ gate() {
   return $failed
 }
 
-# Entry points the Graph Engine could not analyze are reported by the CLI only in its log.
+# The CLI exits 0 even when the Graph Engine fails on an entry point; it records that only
+# in its log. A log that cannot be found or read is therefore an execution error, not a pass.
 graph_engine_limitations() {
   local log count
-  log="$(grep -o '/[^ ]*sfca-[0-9_]*\.log' "$out/sfge.txt" | tail -1)"
-  [[ -n "$log" && -f "$log" ]] || return 0
+  log="$(grep -o '/[^ ]*sfca-[0-9_]*\.log' "$out/sfge.txt" 2>/dev/null | tail -1)"
+  if [[ -z "$log" || ! -f "$log" ]]; then
+    EXECUTION_ERRORS+=("sfge: the Graph Engine log could not be read, so entry points it failed to analyze would go unreported")
+    return 0
+  fi
   count="$(grep -c 'Internal execution error' "$log" || true)"
   if [[ "${count:-0}" -gt 0 ]]; then
+    UNANALYZED_ENTRY_POINTS=$count
     {
       echo "ANALYSIS LIMITATION: the Graph Engine could not analyze $count entry point(s):"
       grep 'Internal execution error' "$log" \
@@ -100,7 +130,7 @@ graph_engine_limitations() {
 }
 
 summarize() {
-  python3 -I - "$out" "${SCAN_NAMES[@]}" <<'PY'
+  UNANALYZED="$UNANALYZED_ENTRY_POINTS" ERRORS="$(printf '%s\n' "${EXECUTION_ERRORS[@]}")" python3 -I - "$out" "${SCAN_NAMES[@]}" <<'PY'
 import json, os, sys
 out, names = sys.argv[1], sys.argv[2:]
 lines = ['| Scan | Critical | High | Moderate | Low | Info |', '|---|---:|---:|---:|---:|---:|']
@@ -111,6 +141,11 @@ for name in names:
         lines.append(f'| {name} | no report | | | | |')
         continue
     lines.append(f'| {name} | ' + ' | '.join(str(counts.get(f'sev{i}', 0)) for i in range(1, 6)) + ' |')
+lines.append('')
+lines.append('Graph Engine entry points it could not analyze (analysis limitation, not a pass): ' + os.environ.get('UNANALYZED', '0'))
+errors = [line for line in os.environ.get('ERRORS', '').splitlines() if line]
+lines.append('Scanner execution errors: ' + (str(len(errors)) if errors else '0'))
+lines.extend('* ' + line for line in errors)
 text = '\n'.join(lines)
 print(text)
 summary = os.environ.get('GITHUB_STEP_SUMMARY')
@@ -131,6 +166,17 @@ audit() {
   scan sfge none sfge
   graph_engine_limitations
   summarize
+  if [[ ${#EXECUTION_ERRORS[@]} -gt 0 ]]; then
+    local failure
+    for failure in "${EXECUTION_ERRORS[@]}"; do
+      if [[ -n "$GITHUB_ACTIONS" ]]; then
+        echo "::error title=Code Analyzer scanner execution error::$failure"
+      else
+        echo "SCANNER EXECUTION ERROR: $failure" >&2
+      fi
+    done
+    blocking=1
+  fi
   return $blocking
 }
 

@@ -157,4 +157,36 @@ describe("c-sfdc-dcx-record-documents", () => {
       jest.useRealTimers();
     }
   });
+
+  it("stops polling when removed and polls again when added back", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+    try {
+      getContext.mockResolvedValue({ canSubmit: true, acceptedFormats: [] });
+      listRecordFiles.mockResolvedValue([]);
+      listJobs.mockResolvedValue([
+        { id: "a01", name: "DOC-1", status: "Processing" },
+      ]);
+      const element = createElement("c-sfdc-dcx-record-documents", {
+        is: SfdcDcxRecordDocuments,
+      });
+      element.recordId = "001A";
+      document.body.appendChild(element);
+      await settle();
+      expect(jest.getTimerCount()).toBe(1);
+      document.body.removeChild(element);
+      expect(jest.getTimerCount()).toBe(0);
+      jest.advanceTimersByTime(60000);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(1);
+      document.body.appendChild(element);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(2);
+      expect(jest.getTimerCount()).toBe(1);
+      jest.advanceTimersByTime(8000);
+      await settle();
+      expect(listJobs).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

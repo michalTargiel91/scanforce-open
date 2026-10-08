@@ -23,7 +23,7 @@ Behaviour worth knowing:
   failing the upload. Users without the permission are skipped by the entry
   condition.
 * The Flows ship without fault paths (the Flow Scanner reports
-  `MissingFaultHandler`). An unexpected error in an action would therefore fail
+  `MissingFaultHandler`, severity 2 / High, once per Flow). An unexpected error in an action would therefore fail
   the Flow and, in the intake Flow, the upload that triggered it. Add fault paths
   that match your policy before you activate them in production.
 * The submit runs as the uploading user, so that user needs **ScanForce Open

@@ -373,4 +373,22 @@ describe("c-sfdc-dcx-workspace", () => {
     await settle();
     expect(ids()).toEqual(["068N"]);
   });
+
+  it("stops polling when removed and polls again when added back", async () => {
+    const element = mount();
+    await settle();
+    expect(jest.getTimerCount()).toBe(1);
+    document.body.removeChild(element);
+    expect(jest.getTimerCount()).toBe(0);
+    jest.advanceTimersByTime(60000);
+    await settle();
+    expect(listJobs).toHaveBeenCalledTimes(1);
+    document.body.appendChild(element);
+    await settle();
+    expect(listJobs).toHaveBeenCalledTimes(2);
+    expect(jest.getTimerCount()).toBe(1);
+    jest.advanceTimersByTime(8000);
+    await settle();
+    expect(listJobs).toHaveBeenCalledTimes(3);
+  });
 });

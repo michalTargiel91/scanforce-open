@@ -294,4 +294,28 @@ describe("c-sfdc-dcx-job-detail", () => {
       jest.useRealTimers();
     }
   });
+
+  it("stops polling when removed and polls again when added back", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick"] });
+    try {
+      getJob.mockResolvedValue({ ...BASE, status: "Processing" });
+      const element = mount();
+      await settle();
+      expect(jest.getTimerCount()).toBe(1);
+      document.body.removeChild(element);
+      expect(jest.getTimerCount()).toBe(0);
+      jest.advanceTimersByTime(60000);
+      await settle();
+      expect(getJob).toHaveBeenCalledTimes(1);
+      document.body.appendChild(element);
+      await settle();
+      expect(getJob).toHaveBeenCalledTimes(2);
+      expect(jest.getTimerCount()).toBe(1);
+      jest.advanceTimersByTime(6000);
+      await settle();
+      expect(getJob).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

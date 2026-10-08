@@ -17,6 +17,10 @@ args = sys.argv[1:]
 with open(os.environ["FAKE_LOG"], "a") as log:
     log.write(json.dumps(args) + "\n")
 selectors = [args[i + 1] for i, value in enumerate(args) if value == "--rule-selector"]
+crashing = [name for name in os.environ.get("FAKE_CRASH", "").split(",") if name]
+if any(name in selectors for name in crashing):
+    print("Error: the engine crashed", file=sys.stderr)
+    sys.exit(1)
 for i, value in enumerate(args):
     if value == "--output-file":
         path = args[i + 1]
@@ -41,9 +45,15 @@ TARGETS = [
 
 
 class CodeAnalyzerGateTest(unittest.TestCase):
-    def run_script(self, *arguments, fail="", sfge_log=None):
+    def run_script(self, *arguments, fail="", crash="", sfge_log=None):
         with tempfile.TemporaryDirectory() as directory:
             tmp = Path(directory)
+            if sfge_log is None:
+                # A Graph Engine run that analyzed everything: a readable log without errors.
+                sfge_log = tmp / "sfca-2026_10_08_00_00_00_000.log"
+                sfge_log.write_text("[t] Info Core - done\n")
+            elif sfge_log == "missing":
+                sfge_log = tmp / "sfca-2026_10_08_00_00_00_999.log"
             project = tmp / "project"
             (project / "scripts").mkdir(parents=True)
             shutil.copy2(SCRIPT, project / "scripts/code-analyzer.sh")
@@ -55,10 +65,10 @@ class CodeAnalyzerGateTest(unittest.TestCase):
                 "PATH": f"{tmp}:{os.environ['PATH']}",
                 "FAKE_LOG": str(tmp / "calls"),
                 "FAKE_FAIL": fail,
+                "FAKE_CRASH": crash,
             }
             env.pop("GITHUB_STEP_SUMMARY", None)
-            if sfge_log:
-                env["FAKE_SFGE_LOG"] = str(sfge_log)
+            env["FAKE_SFGE_LOG"] = str(sfge_log)
             report_dir = tmp / "reports"
             command = ["bash", "scripts/code-analyzer.sh", *arguments]
             if arguments and arguments[0] == "audit":
@@ -136,13 +146,46 @@ class CodeAnalyzerGateTest(unittest.TestCase):
             self.assertIn(f"{name}.json", reports)
             self.assertIn(f"{name}.sarif", reports)
         self.assertIn("recommended.html", reports)
-        for advisory in ("pmd:AppExchange", "flow", "cpd", "sfge", "Recommended"):
+        # Findings above a threshold exit non-zero and stay advisory (a report was written).
+        for advisory in ("pmd:AppExchange", "flow"):
             run, calls, _, _ = self.run_script("audit", fail=advisory)
             self.assertEqual(run.returncode, 0, advisory)
             self.assertEqual(len(calls), 6, advisory)
         run, calls, _, _ = self.run_script("audit", fail="pmd:Apex")
         self.assertEqual(run.returncode, 1)
         self.assertEqual(len(calls), 6, "later scans must still run after a blocking failure")
+
+    def test_a_scanner_that_exits_non_zero_without_a_threshold_is_an_execution_error(self):
+        # No threshold means a non-zero exit cannot be a finding.
+        for broken in ("Recommended", "cpd", "sfge"):
+            run, calls, _, _ = self.run_script("audit", fail=broken)
+            self.assertEqual(run.returncode, 1, broken)
+            self.assertIn("SCANNER EXECUTION ERROR", run.stderr, broken)
+            self.assertIn("without a severity threshold", run.stderr, broken)
+            self.assertEqual(len(calls), 6, "later scans must still run")
+
+    def test_a_scanner_that_crashes_without_a_report_never_passes(self):
+        # Covers the thresholded scans too: a Critical finding also exits 1, only the report tells them apart.
+        for scan in ("pmd:Apex", "Recommended", "pmd:AppExchange", "flow", "cpd", "sfge"):
+            run, calls, _, _ = self.run_script("audit", crash=scan)
+            self.assertEqual(run.returncode, 1, scan)
+            self.assertIn("SCANNER EXECUTION ERROR", run.stderr, scan)
+            self.assertIn("no readable report", run.stderr, scan)
+            self.assertEqual(len(calls), 6, "later scans must still run")
+
+    def test_an_unreadable_graph_engine_log_is_not_a_clean_analysis(self):
+        run, _, _, limitations = self.run_script("audit", sfge_log="missing")
+        self.assertEqual(run.returncode, 1, run.stderr)
+        self.assertIn("SCANNER EXECUTION ERROR", run.stderr)
+        self.assertIn("Graph Engine log could not be read", run.stderr)
+        self.assertEqual(limitations, "")
+
+    def test_a_clean_graph_engine_run_reports_no_limitation(self):
+        run, _, reports, limitations = self.run_script("audit")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(limitations, "")
+        self.assertNotIn("sfge-limitations.txt", reports)
+        self.assertNotIn("SCANNER EXECUTION ERROR", run.stderr)
 
     def test_graph_engine_limitations_are_reported_not_hidden(self):
         with tempfile.TemporaryDirectory() as directory:

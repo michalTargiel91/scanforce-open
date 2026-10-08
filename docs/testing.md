@@ -62,6 +62,24 @@ Rules of the road:
   budget. The audit prints this as `ANALYSIS LIMITATION`, never as a pass. Source
   authorization on that path is covered by the Apex tests (`USER_MODE` reads, link and
   record checks, SYSTEM_MODE only after them).
+* **Four different outcomes.** The deep audit keeps them apart. *Findings* are in the
+  reports (severity 1 Critical to 5 Info). An *analysis limitation* means the engine
+  could not examine something, which is not a pass. A *false positive* is a finding
+  with a written technical reason (below). A *scanner execution error* (a scan that
+  wrote no readable report, an unthresholded scan that exited non-zero, a Graph Engine
+  log that cannot be read) fails the audit with `SCANNER EXECUTION ERROR`. A thresholded
+  scan exits with the severity it hit, so a Critical finding exits 1 like a failure
+  does: only the report tells them apart.
+* **Standing advisory results** (deep audit, 2026-10-08, Code Analyzer 5.16.0):
+  * Flow Scanner, the two example Flows: 2 × `MissingFaultHandler` at **severity 2
+    (High)** and 10 × `MissingDescription` at severity 4 (Low). Both Flows deploy as
+    Draft, and where a fault goes (ignore it, notify someone, or fail the upload) is the
+    adopter's decision, so no fault path is shipped. The example README says so. These
+    are advisory, not clean.
+  * Graph Engine: 2 entry points unanalyzed (above) and 6 Moderate findings that are
+    false positives. `onlyFields.contains` is reached only when `onlyFields == null ||`
+    is false, `recordId.getSObjectType` only after `if (recordId == null) continue;`,
+    and the four `LIMIT :cap` queries use `cap = COUNT_CAP + 1`, a constant.
 * **npm advisories.** Production dependencies are a gate (`npm audit --omit=dev`); the
   development toolchain is reported only, because nothing from npm is deployed.
 
