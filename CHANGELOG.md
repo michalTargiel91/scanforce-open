@@ -10,12 +10,13 @@ evidence and remaining recommendations are in the
 [review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md). No change to the architecture,
 `/connect/v1`, API version (67.0) or any public contract.
 
-**Upgrading from 1.0.3:** deploy `force-app` again
+**Upgrading from 1.0.3:** from a checkout of this release, deploy `force-app` again
 (`bash scripts/install.sh --target-org my-org --skip-credentials --allow-pending-jobs`; see
 [upgrading](docs/install.md#upgrading)). Jobs, source associations, field mappings, permission
 sets, recovery schedules and the Named/External Credential (including a custom authentication
 formula such as HTTP Basic) are kept. Do **not** redeploy `provider-config/` over an existing
-installation.
+installation. Verified on a disposable API 67 scratch org with synthetic jobs, mappings,
+twelve recovery schedules and HTTP Basic credentials preserved.
 
 ### Fixes
 
