@@ -94,6 +94,11 @@ public without sharing class SfdcDcx_ProcessingJobSelector {
 
   /** Oldest durable automatic work, due work first, without loading source bytes. */
   public static SfdcDcx_Processing_Job__c selectNextAutomatic() {
+    return selectNextAutomatic(new Set<Id>());
+  }
+
+  /** As above, leaving out jobs whose processing already failed in the running chain. */
+  public static SfdcDcx_Processing_Job__c selectNextAutomatic(Set<Id> skip) {
     Datetime now = System.now();
     List<SfdcDcx_Processing_Job__c> rows = [
       SELECT Id, Attempt_Count__c, Provider_Job_Id__c, Next_Attempt_At__c
@@ -102,6 +107,7 @@ public without sharing class SfdcDcx_ProcessingJobSelector {
         Status__c IN ('Queued', 'Submitting', 'Processing')
         AND (Next_Attempt_At__c = NULL
         OR Next_Attempt_At__c <= :now)
+        AND Id NOT IN :skip
       WITH SYSTEM_MODE
       ORDER BY Next_Attempt_At__c ASC NULLS FIRST, CreatedDate ASC
       LIMIT 1

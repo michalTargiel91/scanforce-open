@@ -99,6 +99,8 @@ See [security](security.md) for the threat model.
    ready), locks the row, verifies the generation and writes the transition
    through `SfdcDcx_ProcessingJobDomain`. It then enqueues at most one
    continuation, chosen from durable rows (the next due job), never a backlog.
+   If an execution fails with an error nothing could handle, a finalizer defers
+   that job and continues the chain without it ([recovery](recovery.md#a-job-that-cannot-be-processed)).
 4. **Stop.** Completed, Failed, Cancelled and Timed Out are terminal. Review
    Required stops automatic polling until someone refreshes.
 5. **Recover.** The five-minute sweep starts a new chain from durable state when

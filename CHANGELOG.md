@@ -11,6 +11,21 @@ No change to the architecture, `/connect/v1` or any public contract.
 
 ### Fixes
 
+* **One job that cannot be processed no longer stops the others.** When an execution failed
+  with an error nothing could handle (for example a customer validation rule or Flow fault that
+  rejects ScanForce Open's update), the job stayed the oldest due job and every recovery sweep
+  chose it first again, so no other job moved. A finalizer now defers the job (one attempt spent,
+  the usual retry delay) and the chain continues without it, keeping the 20-execution cap.
+  User-requested refreshes are not retried and finished jobs are not touched. Found by the
+  best-practices review, which reproduced it: ten healthy jobs stayed untouched behind one
+  rejected job, and processed within seconds once it was skipped. No schema, status or
+  public-contract change.
+* **Try again after a provider-confirmed failure or cancellation works.** Polling that
+  ends in `REMOTE_JOB_FAILED` or `REMOTE_JOB_CANCELLED` now releases the submission
+  identity so a new attempt can be submitted; uncertain outcomes still keep it.
+* **IDs of unknown or deleted object types no longer break jobs or batches.** An
+  unrecognized key prefix is treated as unavailable for that item only (submit, list,
+  details, labels and mapping eligibility), so other items continue.
 * The Configuration page's **overdue** count now includes jobs nobody has started yet
   (their `Next_Attempt_At__c` is empty), the case [recovery](docs/recovery.md) describes: a
   Queued job older than 15 minutes with no recovery schedule used to raise no warning.
