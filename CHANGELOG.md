@@ -32,6 +32,9 @@ No change to the architecture, `/connect/v1` or any public contract.
   spinner while loading, and a reload that fails after a successful submit no longer
   reports "Submission failed". A failed preview refresh after a mapping was applied says so
   instead of reporting the update as failed.
+* **Keyboard focus is visible on the Workspace status tiles and the Configuration provider
+  cards.** A selected tile or card looked the same with and without focus; focus now draws a
+  2 px outline (verified in a rendered page; mouse clicks do not show it).
 * **The Configuration page keeps an endpoint you are typing** when Refresh or another
   action re-reads the status. The job page stops saying it "updates automatically" once the
   status check has finished, and says when the provider has not changed.

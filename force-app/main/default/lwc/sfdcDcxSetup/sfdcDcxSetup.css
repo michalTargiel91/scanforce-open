@@ -15,7 +15,12 @@
 .sfo-provider:hover,
 .sfo-provider:focus {
   border-color: #0b5cab;
-  outline: none;
+}
+
+/* A selected card already has this border and shadow, so keyboard focus needs its own mark. */
+.sfo-provider:focus-visible {
+  outline: 2px solid #0b5cab;
+  outline-offset: 2px;
 }
 
 .sfo-provider_selected {

@@ -14,7 +14,12 @@
 .sfo-tile:hover,
 .sfo-tile:focus {
   border-color: #0b5cab;
-  outline: none;
+}
+
+/* A selected tile already has this border and shadow, so keyboard focus needs its own mark. */
+.sfo-tile:focus-visible {
+  outline: 2px solid #0b5cab;
+  outline-offset: 2px;
 }
 
 .sfo-tile_selected {

@@ -196,21 +196,39 @@ test that fails without the fix (red) and passes with it (green).
   change. Not done here: the verified route is a metadata deployment, which belongs in a
   tested script rather than prose.
 
-## D5. Lower-severity Lightning Web Component defects *(partly fixed)*
+## D5. Lower-severity Lightning Web Component defects *(fixed or retracted)*
 
 All are user-visible but none loses data. "Re-read" means I confirmed the code path.
 
 **Status:** A3, A5, A6 and A8–A12 are fixed in the LWC follow-up pull request, each with a
-Jest test that failed on the unfixed code first. A1 and A7 are open: they are statements
-about rendered pixels, so they need a rendered page, not arithmetic.
+Jest test that failed on the unfixed code first. A1 and A7 are statements about rendered
+pixels, so they were checked in a rendered page instead of by arithmetic: **A1 was
+confirmed and is fixed; A7 was not reproduced and is retracted.**
+
+**Rendered check [M].** One Enterprise scratch org (API 67), Chromium driven by Playwright,
+the default Lightning theme at a desktop width, keyboard focus.
+
+* **A1, before the fix.** On the Workspace tiles and the Setup provider cards, a selected
+  item with keyboard focus (`:focus-visible` true) had the same computed border, shadow and
+  outline as the unfocused one, and the two screenshots were byte-identical (SHA-256 equal,
+  0 differing pixels). An unselected tile changed only its 1 px border colour.
+* **A1, after the fix.** Keyboard focus draws a solid 2 px outline (`#0b5cab`, offset 2 px)
+  on selected and unselected items; the screenshots now differ; a mouse click leaves no ring.
+* **A7.** The helper text (`slds-text-color_weak`, `#5c5c5c`) measured **5.32:1 on the
+  success banner and 5.31:1 on the warning banner** (WCAG AA needs 4.5:1); the error banner
+  the org produced naturally measured 6.06:1. The review's earlier 1.1–2.1:1 and 2.3–4.4:1
+  came from assumed SLDS grey tokens, not from the colours the page renders, so the claim is
+  withdrawn. The success and warning banners were made by cloning the real banner node and
+  changing only its tone class; the org could not produce those two outcomes without a
+  working provider.
 
 | ID | Component | Defect | Label | Severity | Status |
 |---|---|---|---|---|---|
-| A1 | Workspace, Setup | `outline:none` with an identical selected style: a focused, selected tile or card has no visible focus (WCAG 2.4.7) | [R] *re-read* | Low–Medium | Open |
+| A1 | Workspace, Setup | `outline:none` with an identical selected style: a focused, selected tile or card has no visible focus (WCAG 2.4.7) | [R] *re-read*, then [M] rendered | Low–Medium | Fixed |
 | A3 | Workspace, RecordDocuments | time with the tab hidden counts toward the 20-minute idle limit and nothing refreshes when the tab returns | [R] *re-read* | Low | Fixed |
 | A5 | JobDetail | `load()` has no ordering guard; a slow older response can overwrite a newer one and leave no timer (the same class as the workspace race fixed in 1.0.3) | [R] *re-read* | Low | Fixed |
 | A6 | Workspace | the "No processing jobs yet" text shows while loading and after a failed load | [R] *re-read* | Low | Fixed |
-| A7 | Setup | grey helper text on the green or orange connection-result banner: computed 1.1–2.1:1 on green and 2.3–4.4:1 on orange with SLDS grey tokens (WCAG 1.4.3). Verify in DevTools | [R] arithmetic re-run | Low–Medium | Open |
+| A7 | Setup | grey helper text on the green or orange connection-result banner: computed 1.1–2.1:1 on green and 2.3–4.4:1 on orange with SLDS grey tokens (WCAG 1.4.3). Verify in DevTools | [R] arithmetic, **not reproduced** [M] | Low–Medium | Retracted |
 | A8 | Setup | an unsaved endpoint draft is overwritten when Refresh, Install recovery or Grant access re-applies status | [R] *re-read* | Low | Fixed |
 | A9 | RecordDocuments, MappingPanel | a failing reload after a successful action is reported as a failure of the action ("Submission failed" after "Processing started") | [R] *re-read* (RecordDocuments) | Low | Fixed |
 | A10 | Workspace, RecordDocuments | with more than one batch, a failure in a later batch hides that earlier batches already created jobs | [R] | Low | Fixed |
@@ -558,10 +576,11 @@ Other operational notes:
 
 A delegated read-only reviewer read all nine bundles, ran the existing Jest suite and
 about fifteen throw-away probes, and reported the items below. I re-read the code behind
-the items marked *re-read* in [D5](#d5-lower-severity-lightning-web-component-defects-partly-fixed);
+the items marked *re-read* in [D5](#d5-lower-severity-lightning-web-component-defects-fixed-or-retracted);
 the others rest on the reviewer's report.
-Nothing was rendered in a browser, so contrast and screen-reader statements come from the
-CSS and markup.
+The reviewer rendered nothing, so its contrast and screen-reader statements came from the
+CSS and markup. I rendered the two claims that depend on pixels (A1 and A7, see D5); the
+rest, and every screen-reader statement, still come from code.
 
 **Already correct (credit):**
 
@@ -643,7 +662,7 @@ Ordered by severity, then likelihood, user impact and effort.
 | R4 | Show schedule owner, owner active state and next fire on the Configuration page; document the installing-user guidance | Low–Medium | Low–Medium | Medium | Small | Additive UI |
 | R9 | Fix the uninstall instructions (D4), ideally with a small tested script | Low–Medium | Certain on uninstall | Low | Small | Docs or script |
 | R5 | Distinct error code and guidance for "credential or access not usable" | Low | High (first-time setup) | Low | Small | Error code addition |
-| R7 | Fix A3, A5, A6, A8–A12 (done individually, see D5); one shared poller; A1 and A7 after a rendered check | Low | Medium | Low | Medium | LWC |
+| R7 | Fix A1, A3, A5, A6, A8–A12 (done individually, see D5); A7 retracted; one shared poller still open | Low | Medium | Low | Medium | LWC |
 | R8 | Retention guidance and a scheduled-Flow example; state that nobody has Delete by default | Low–Medium | Certain over time | Medium | Small | Documentation |
 | R10 | Sandbox refresh checklist | Low | Medium | Medium | Small | Documentation |
 | R11 | Indexes on `Source_Record_Id__c` and `Source_File_Id__c` when a subscriber exceeds about 500,000 jobs | Low | Low | Low | Small | Schema, wait for evidence |
@@ -780,8 +799,10 @@ No test was added merely for coverage. The three added tests each protect a prov
 * **Synthetic data, one dataset shape.** The 250,000 rows share a creation window and a
   small set of source IDs.
 * **The browser Setup route for uninstall** could not be confirmed.
-* **Accessibility and visual statements** come from code and CSS, not from a screen reader
-  or a rendered page.
+* **Accessibility and visual statements** other than A1 and A7 come from code and CSS, not
+  from a screen reader or a rendered page. A1 and A7 were measured in one org and one
+  browser (Chromium) with the default theme; other SLDS releases, dark mode, custom
+  branding, Safari and Firefox were not checked.
 
 ## Reproduction notes
 
