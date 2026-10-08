@@ -35,6 +35,21 @@ never reach the provider, run **Test connection** on the Configuration page: it
 reports *No API key stored* or *No access to the provider credential* for these
 cases.
 
+## Capacity
+
+Background work is deliberately bounded: each submission starts one chain of at most 20
+executions, and the five-minute sweep starts one more. In a measured Enterprise-edition
+scratch org, a backlog of due jobs drained at **20 executions per sweep** (about three
+seconds each), roughly 240 an hour. A document needs one execution to send and at least
+one more to collect its result, so a single upload of around a hundred documents or more
+queues behind that limit.
+
+The 60-minute budget counts from the moment the job was created, not from the first
+request to the provider. In the same test, of 300 jobs created together the last 60 ended
+**Timed Out** without ever being attempted. **Try again** reconnects them. For large
+batches, upload in waves (for example 50 at a time) and let each wave finish. The figures
+and method are in the [best-practices review](SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md#r2-throughput-and-the-60-minute-age-cap).
+
 ## Duplicate protection
 
 * **Provider idempotency**: every job has an immutable key; retries reuse it.

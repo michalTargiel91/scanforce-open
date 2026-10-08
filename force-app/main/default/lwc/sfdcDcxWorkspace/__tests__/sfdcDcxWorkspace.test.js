@@ -391,4 +391,49 @@ describe("c-sfdc-dcx-workspace", () => {
     await settle();
     expect(listJobs).toHaveBeenCalledTimes(3);
   });
+
+  it("forgets a picked file when the list is rebuilt, so only visibly selected files are submitted", async () => {
+    const file = (id, title) => ({
+      contentVersionId: id,
+      title,
+      extension: "pdf",
+      size: 1000,
+      supported: true,
+    });
+    listRecentFiles.mockResolvedValue([file("068D", "Statement")]);
+    const element = mount();
+    await settle();
+    Array.from(element.shadowRoot.querySelectorAll("lightning-button"))
+      .find((button) => button.label === "Choose from Salesforce Files")
+      .click();
+    await settle();
+    element.shadowRoot.querySelector("lightning-datatable").dispatchEvent(
+      new CustomEvent("rowselection", {
+        detail: { selectedRows: [{ contentVersionId: "068D" }] },
+      }),
+    );
+    await settle();
+    const processButton = () =>
+      Array.from(element.shadowRoot.querySelectorAll("lightning-button")).find(
+        (button) => /^Process (\d+ )?selected$/.test(button.label),
+      );
+    expect(processButton().label).toBe("Process 1 selected");
+    expect(processButton().disabled).toBe(false);
+
+    // The search rebuilds the table, which comes back with nothing selected.
+    const search = Array.from(
+      element.shadowRoot.querySelectorAll("lightning-input"),
+    ).find((input) => input.type === "search");
+    search.dispatchEvent(
+      new CustomEvent("change", { detail: { value: "state" } }),
+    );
+    jest.advanceTimersByTime(300);
+    await settle();
+    expect(
+      element.shadowRoot.querySelector("lightning-datatable").selectedRows,
+    ).toBeUndefined();
+    expect(processButton().label).toBe("Process selected");
+    expect(processButton().disabled).toBe(true);
+    expect(submitFiles).not.toHaveBeenCalled();
+  });
 });

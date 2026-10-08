@@ -430,12 +430,17 @@ public with sharing class SfdcDcx_SetupController {
     Activity activity = new Activity();
     activity.statusCounts = SfdcDcx_JobQuery.countUserVisibleByFilter();
     Datetime overdueBefore = System.now().addMinutes(-15);
+    // Work is due when Next_Attempt_At__c has passed or, before its first attempt, as soon
+    // as it exists, so a job nobody has started counts from its creation.
     activity.overdue = [
       SELECT COUNT()
       FROM SfdcDcx_Processing_Job__c
       WHERE
         Status__c IN ('Queued', 'Submitting', 'Processing')
-        AND Next_Attempt_At__c < :overdueBefore
+        AND ((Next_Attempt_At__c != NULL
+        AND Next_Attempt_At__c < :overdueBefore)
+        OR (Next_Attempt_At__c = NULL
+        AND CreatedDate < :overdueBefore))
       WITH USER_MODE
     ];
     return activity;

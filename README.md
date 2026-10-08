@@ -162,7 +162,7 @@ described in [SECURITY.md](SECURITY.md).
 | [Provider protocol `/connect/v1`](docs/provider-protocol.md) | The complete provider contract |
 | [Build your own provider](docs/provider-custom.md) · [Use DocSolved.ai](docs/provider-docsolved.md) | Provider guides |
 | [Architecture](docs/architecture.md) · [Security](docs/security.md) · [Recovery](docs/recovery.md) | How it works inside |
-| [Testing](docs/testing.md) | Validation lanes and release checks |
+| [Testing](docs/testing.md) · [Best-practices review](docs/SALESFORCE_BEST_PRACTICES_REVIEW_2026-10.md) | Validation lanes and release checks; independent architecture review (October 2026) |
 | [Distribution options](docs/distribution.md) | Source, unlocked, managed and AppExchange compared |
 | [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) | Where the project is going |
 

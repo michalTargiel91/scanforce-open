@@ -327,6 +327,8 @@ export default class SfdcDcxWorkspace extends NavigationMixin(
 
   async loadFiles() {
     const request = ++this.filesRequest;
+    // The table is rebuilt without selected rows: forget picks it no longer shows.
+    this.selectedVersionIds = [];
     this.filesLoading = true;
     try {
       const files = await listRecentFiles({ searchTerm: this.fileSearch });
